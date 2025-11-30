@@ -1,0 +1,55 @@
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Build artifacts
+*.tar.gz
+*.zip
+flatcar_production_image.bin
+flatcar_production_image.bin.bz2
+
+# Generated configs
+*.ign
+ignition/
+
+# Local development
+.env
+*.log
+credentials.txt
+*-credentials.txt
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Secrets (never commit!)
+*secret*
+*password*
+*token*
+.secrets/
+
+# Node modules (for examples)
+node_modules/
+package-lock.json
+
+# Python (for examples)
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+venv/
+env/
+
+# Build directories
+flatcar-swarm-deploy/
+__build__/
