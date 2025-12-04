@@ -1,0 +1,23 @@
+---
+kind: pipeline
+type: docker
+name: deploy
+
+steps:
+  - name: deploy-stack
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stack deploy -c docker-compose.yml myapp
+    when:
+      branch:
+        - main
+      event:
+        - push
+
+volumes:
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
