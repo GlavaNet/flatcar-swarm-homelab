@@ -1,55 +1,46 @@
+# Flatcar deployment artifacts
+flatcar-pi-deploy/
+*.ign
+*.yaml.bak
+
+# SSH keys
+*.pub
+*.pem
+id_rsa*
+
+# Logs
+*.log
+/var/log/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+
 # OS files
 .DS_Store
 Thumbs.db
-*.swp
-*.swo
-*~
 
-# Build artifacts
-*.tar.gz
-*.zip
-flatcar_production_image.bin
-flatcar_production_image.bin.bz2
+# Drone CI
+drone-stack.yml
+.drone.secret
 
-# Generated configs
-*.ign
-ignition/
-
-# Local development
+# Environment files with secrets
 .env
-*.log
-credentials.txt
-*-credentials.txt
+*.env
 
-# IDE files
+# Docker secrets
+docker-compose.override.yml
+
+# Backup files
+*.bak
+*.backup
+
+# IDE
 .vscode/
 .idea/
 *.iml
 
-# Temporary files
-tmp/
-temp/
-*.tmp
-
-# Secrets (never commit!)
-*secret*
-*password*
-*token*
-.secrets/
-
-# Node modules (for examples)
-node_modules/
-package-lock.json
-
-# Python (for examples)
-__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
-.pytest_cache/
-venv/
-env/
-
-# Build directories
-flatcar-swarm-deploy/
-__build__/
+# Local test configs
+test-*.sh
+*-test.yml

@@ -6,7 +6,7 @@ set -euo pipefail
 
 # Configuration
 SWARM_MANAGER_PRIMARY="swarm-manager-1"
-SWARM_ADVERTISE_ADDR="eth0"
+SWARM_ADVERTISE_ADDR=$(ip -4 route get 1.1.1.1 | grep -oP 'src \K\S+')
 TOKEN_SERVER_PORT="8080"
 TOKEN_DIR="/opt/swarm-tokens"
 LOG_FILE="/var/log/swarm-bootstrap.log"
@@ -49,12 +49,10 @@ init_swarm() {
         return 0
     fi
     
-    # Get IP address
-    local ip_addr
-    ip_addr=$(ip -4 addr show "$SWARM_ADVERTISE_ADDR" | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1)
+    local ip_addr="$SWARM_ADVERTISE_ADDR"
     
     if [ -z "$ip_addr" ]; then
-        log "ERROR: Could not determine IP address for $SWARM_ADVERTISE_ADDR"
+        log "ERROR: Could not determine IP address"
         return 1
     fi
     
@@ -86,13 +84,17 @@ start_token_server() {
     log "Starting token distribution server on port $TOKEN_SERVER_PORT..."
     
     # Kill existing server if running
-    pkill -f "python.*$TOKEN_SERVER_PORT" || true
+    docker rm -f token-server 2>/dev/null || true
     
-    # Start simple Python HTTP server in background
-    cd "$TOKEN_DIR"
-    nohup python3 -m http.server "$TOKEN_SERVER_PORT" > /var/log/token-server.log 2>&1 &
+    # Start nginx container serving token directory
+    docker run -d \
+        --name token-server \
+        --restart unless-stopped \
+        -v "$TOKEN_DIR:/usr/share/nginx/html:ro" \
+        -p "$TOKEN_SERVER_PORT:80" \
+        nginx:alpine > /dev/null 2>&1
     
-    log "Token server started (PID: $!)"
+    log "Token server started (container: token-server)"
 }
 
 # Fetch token from primary manager
@@ -168,7 +170,7 @@ join_as_manager() {
     manager_ip=$(fetch_manager_ip "$primary_manager_ip") || return 1
     
     log "Joining swarm at ${manager_ip}:2377 with manager token"
-    docker swarm join --token "$token" "${manager_ip}:2377" || {
+    docker swarm join --token "$token" "${manager_ip}:2377" 2>&1 | tee -a "$LOG_FILE" || {
         log "ERROR: Failed to join swarm as manager"
         return 1
     }
@@ -195,7 +197,7 @@ join_as_worker() {
     manager_ip=$(fetch_manager_ip "$primary_manager_ip") || return 1
     
     log "Joining swarm at ${manager_ip}:2377 with worker token"
-    docker swarm join --token "$token" "${manager_ip}:2377" || {
+    docker swarm join --token "$token" "${manager_ip}:2377" 2>&1 | tee -a "$LOG_FILE" || {
         log "ERROR: Failed to join swarm as worker"
         return 1
     }
