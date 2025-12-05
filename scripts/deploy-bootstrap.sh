@@ -11,10 +11,15 @@ NODES=(
 )
 
 BOOTSTRAP_SCRIPT="./swarm-bootstrap.sh"
+CLUSTER_INIT_SCRIPT="./cluster-init.sh"
 
 if [ ! -f "$BOOTSTRAP_SCRIPT" ]; then
     echo "Error: $BOOTSTRAP_SCRIPT not found"
     exit 1
+fi
+
+if [ ! -f "$CLUSTER_INIT_SCRIPT" ]; then
+    echo "Warning: $CLUSTER_INIT_SCRIPT not found, skipping cluster init"
 fi
 
 echo "=== Deploying Swarm Bootstrap to Nodes ==="
@@ -27,6 +32,13 @@ for node_info in "${NODES[@]}"; do
     
     # Copy bootstrap script
     scp -o StrictHostKeyChecking=no "$BOOTSTRAP_SCRIPT" core@$ip:/tmp/swarm-bootstrap.sh
+    
+    # Copy cluster-init script only to manager-1
+    if [ "$hostname" = "swarm-manager-1" ] && [ -f "$CLUSTER_INIT_SCRIPT" ]; then
+        echo "  Copying cluster-init.sh to manager-1..."
+        scp -o StrictHostKeyChecking=no "$CLUSTER_INIT_SCRIPT" core@$ip:/home/core/
+        ssh -o StrictHostKeyChecking=no core@$ip 'chmod +x /home/core/cluster-init.sh'
+    fi
     
     # Install and configure
     ssh -o StrictHostKeyChecking=no core@$ip << 'EOF'
@@ -52,6 +64,9 @@ ExecStart=/opt/bin/swarm-bootstrap.sh
 RemainAfterExit=yes
 StandardOutput=journal
 StandardError=journal
+TimeoutStartSec=600
+Restart=on-failure
+RestartSec=30
 
 [Install]
 WantedBy=multi-user.target
@@ -68,6 +83,17 @@ done
 
 echo "=== Bootstrap Deployment Complete ==="
 echo ""
+echo "Waiting 30 seconds for swarm to form..."
+sleep 30
+
+echo "Running cluster initialization on manager-1..."
+ssh -o StrictHostKeyChecking=no core@192.168.99.101 '/home/core/cluster-init.sh' || {
+    echo "Warning: cluster-init.sh not found or failed"
+    echo "Run manually: ssh core@192.168.99.101 '/home/core/cluster-init.sh'"
+}
+
+echo ""
+echo "=== Cluster Setup Complete ==="
 echo "Check cluster status:"
 echo "  ssh core@192.168.99.101 'docker node ls'"
 echo ""
