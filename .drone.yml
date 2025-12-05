@@ -1,6 +1,21 @@
 ---
 kind: pipeline
 type: docker
+name: poll-repo
+
+trigger:
+  event: [cron]
+  cron: [hourly]
+
+steps:
+  - name: check-updates
+    image: alpine/git
+    commands:
+      - echo "Checking for updates..."
+
+---
+kind: pipeline
+type: docker
 name: deploy-stacks
 
 steps:
@@ -13,7 +28,6 @@ steps:
       - docker stack deploy -c stacks/traefik/traefik-stack.yml traefik
     when:
       branch: [main]
-      event: [push]
       paths: [stacks/traefik/**]
 
   - name: deploy-monitoring
@@ -25,7 +39,6 @@ steps:
       - docker stack deploy -c stacks/monitoring/monitoring-stack.yml monitoring
     when:
       branch: [main]
-      event: [push]
       paths: [stacks/monitoring/**]
 
   - name: deploy-adguard
@@ -37,7 +50,6 @@ steps:
       - docker stack deploy -c stacks/adguard/adguard-stack.yml adguard
     when:
       branch: [main]
-      event: [push]
       paths: [stacks/adguard/**]
 
   - name: deploy-vaultwarden
@@ -49,8 +61,21 @@ steps:
       - docker stack deploy -c stacks/vaultwarden/vaultwarden-stack.yml vaultwarden
     when:
       branch: [main]
-      event: [push]
       paths: [stacks/vaultwarden/**]
+
+  - name: notify-success
+    image: curlimages/curl:latest
+    commands:
+      - echo "Deployed successfully - ${DRONE_COMMIT_MESSAGE}"
+    when:
+      status: [success]
+
+  - name: notify-failure
+    image: curlimages/curl:latest
+    commands:
+      - echo "Deployment failed - ${DRONE_COMMIT_MESSAGE}"
+    when:
+      status: [failure]
 
 volumes:
   - name: docker-sock
