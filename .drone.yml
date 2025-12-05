@@ -1,21 +1,56 @@
 ---
 kind: pipeline
 type: docker
-name: deploy
+name: deploy-stacks
 
 steps:
-  - name: deploy-stack
+  - name: deploy-traefik
     image: docker:latest
     volumes:
       - name: docker-sock
         path: /var/run/docker.sock
     commands:
-      - docker stack deploy -c docker-compose.yml myapp
+      - docker stack deploy -c stacks/traefik/traefik-stack.yml traefik
     when:
-      branch:
-        - main
-      event:
-        - push
+      branch: [main]
+      event: [push]
+      paths: [stacks/traefik/**]
+
+  - name: deploy-monitoring
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stack deploy -c stacks/monitoring/monitoring-stack.yml monitoring
+    when:
+      branch: [main]
+      event: [push]
+      paths: [stacks/monitoring/**]
+
+  - name: deploy-adguard
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stack deploy -c stacks/adguard/adguard-stack.yml adguard
+    when:
+      branch: [main]
+      event: [push]
+      paths: [stacks/adguard/**]
+
+  - name: deploy-vaultwarden
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stack deploy -c stacks/vaultwarden/vaultwarden-stack.yml vaultwarden
+    when:
+      branch: [main]
+      event: [push]
+      paths: [stacks/vaultwarden/**]
 
 volumes:
   - name: docker-sock
