@@ -1,10 +1,42 @@
 ---
 kind: pipeline
 type: docker
-name: test
+name: deploy-stacks
 
 steps:
-  - name: hello
-    image: alpine
+  - name: deploy-traefik
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
     commands:
-      - echo "Hello World"
+      - docker stack deploy -c stacks/traefik/traefik-stack.yml traefik
+
+  - name: deploy-monitoring
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stack deploy -c stacks/monitoring/monitoring-stack.yml monitoring
+
+  - name: deploy-adguard
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stack deploy -c stacks/adguard/adguard-stack.yml adguard
+
+  - name: deploy-vaultwarden
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stack deploy -c stacks/vaultwarden/vaultwarden-stack.yml vaultwarden
+
+volumes:
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
