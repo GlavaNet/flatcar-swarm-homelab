@@ -1,5 +1,6 @@
 # Flatcar deployment artifacts
-flatcar-pi-deploy/
+scripts/flatcar-install
+scripts/flatcar-pi-deploy
 *.ign
 *.yaml.bak
 
@@ -44,3 +45,6 @@ docker-compose.override.yml
 # Local test configs
 test-*.sh
 *-test.yml
+
+# Local test scripts
+scripts/flash-single-card.sh
