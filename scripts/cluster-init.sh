@@ -79,7 +79,7 @@ After=docker.service
 Type=oneshot
 User=core
 WorkingDirectory=/home/core/flatcar-swarm-homelab
-ExecStart=/bin/bash -c 'git pull && bash scripts/deploy-services.sh'
+ExecStart=/bin/bash -c 'git fetch origin && git reset --hard origin/main && bash scripts/deploy-services.sh'
 SERVICE
 
 sudo tee /etc/systemd/system/git-poll.timer > /dev/null << 'TIMER'
