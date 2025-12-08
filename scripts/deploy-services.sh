@@ -4,6 +4,8 @@ cd "$(dirname "$0")/.."
 
 echo "Deploying stacks..."
 docker stack deploy -c stacks/traefik/traefik-stack.yml traefik
+sleep 5
+docker stack deploy -c stacks/forgejo/forgejo-stack.yml forgejo
 docker stack deploy -c stacks/monitoring/monitoring-stack.yml monitoring
 docker stack deploy -c stacks/adguard/adguard-stack.yml adguard
 docker stack deploy -c stacks/vaultwarden/vaultwarden-stack.yml vaultwarden

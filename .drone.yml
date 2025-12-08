@@ -12,6 +12,14 @@ steps:
     commands:
       - docker stack deploy -c stacks/traefik/traefik-stack.yml traefik
 
+  - name: deploy-forgejo
+    image: docker:latest
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    commands:
+      - docker stack deploy -c stacks/forgejo/forgejo-stack.yml forgejo
+
   - name: deploy-monitoring
     image: docker:latest
     volumes:
@@ -35,6 +43,20 @@ steps:
         path: /var/run/docker.sock
     commands:
       - docker stack deploy -c stacks/vaultwarden/vaultwarden-stack.yml vaultwarden
+
+  - name: notify-success
+    image: alpine
+    commands:
+      - echo "✓ Deployment successful - ${DRONE_COMMIT_MESSAGE}"
+    when:
+      status: [success]
+
+  - name: notify-failure
+    image: alpine
+    commands:
+      - echo "✗ Deployment failed - ${DRONE_COMMIT_MESSAGE}"
+    when:
+      status: [failure]
 
 volumes:
   - name: docker-sock
