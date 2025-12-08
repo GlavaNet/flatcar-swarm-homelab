@@ -10,9 +10,11 @@ services:
       - USER_GID=1000
       - FORGEJO__database__DB_TYPE=sqlite3
       - FORGEJO__server__DOMAIN=git.local
-      - FORGEJO__server__ROOT_URL=http://git.local
+      - FORGEJO__server__ROOT_URL=http://192.168.99.101:3000
       - FORGEJO__server__HTTP_PORT=3000
       - FORGEJO__webhook__ALLOWED_HOST_LIST=private
+      - FORGEJO__actions__ENABLED=true
+      - FORGEJO__actions__DEFAULT_ACTIONS_URL=https://code.forgejo.org
     volumes:
       - forgejo-data:/data
     networks:
@@ -26,8 +28,10 @@ services:
         - "traefik.http.routers.forgejo.rule=Host(`git.local`)"
         - "traefik.http.services.forgejo.loadbalancer.server.port=3000"
 
+
 volumes:
   forgejo-data:
+
 
 networks:
   traefik-public:
