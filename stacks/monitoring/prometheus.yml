@@ -17,3 +17,18 @@ scrape_configs:
       - names: ['tasks.cadvisor']
         type: 'A'
         port: 8080
+
+  # Add Traefik metrics
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+    metrics_path: '/metrics'
+
+  # Add Docker Swarm metrics
+  - job_name: 'dockerswarm'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'docker_swarm.*'
+        action: keep
