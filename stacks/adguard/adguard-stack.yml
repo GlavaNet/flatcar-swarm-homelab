@@ -45,7 +45,7 @@ volumes:
 
 configs:
   adguard_config_template:
-    file: ./AdGuardHome.yaml.example
+    file: ./config/AdGuardHome.yaml.example
 
 networks:
   traefik-public:
