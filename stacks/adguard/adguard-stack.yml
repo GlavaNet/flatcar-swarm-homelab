@@ -1,4 +1,5 @@
 version: '3.8'
+
 services:
   adguard:
     image: adguard/adguardhome:latest
@@ -9,6 +10,38 @@ services:
     volumes:
       - adguard-work:/opt/adguardhome/work
       - adguard-conf:/opt/adguardhome/conf
+    secrets:
+      - adguard_username
+      - adguard_password_hash
+    configs:
+      - source: adguard_config_template
+        target: /tmp/AdGuardHome.yaml.template
+    entrypoint: /bin/sh
+    command: |
+      -c '
+      CONFIG_FILE="/opt/adguardhome/conf/AdGuardHome.yaml"
+      
+      # Only generate config if it does not exist
+      if [ ! -f "$$CONFIG_FILE" ]; then
+        echo "[AdGuard] Generating initial configuration from template..."
+        USERNAME=$$(cat /run/secrets/adguard_username)
+        PASSHASH=$$(cat /run/secrets/adguard_password_hash)
+        
+        sed -e "s|{{USERNAME}}|$$USERNAME|g" \
+            -e "s|{{PASSWORD_HASH}}|$$PASSHASH|g" \
+            /tmp/AdGuardHome.yaml.template > "$$CONFIG_FILE"
+        
+        echo "[AdGuard] Configuration generated successfully"
+      else
+        echo "[AdGuard] Using existing configuration"
+      fi
+      
+      echo "[AdGuard] Starting AdGuard Home..."
+      exec /opt/adguardhome/AdGuardHome \
+        -c "$$CONFIG_FILE" \
+        -w /opt/adguardhome/work \
+        --no-check-update
+      '
     networks:
       - traefik-public
     deploy:
@@ -18,9 +51,25 @@ services:
         - "traefik.enable=true"
         - "traefik.http.routers.adguard.rule=Host(`adguard.local`)"
         - "traefik.http.services.adguard.loadbalancer.server.port=80"
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+secrets:
+  adguard_username:
+    external: true
+  adguard_password_hash:
+    external: true
+
+configs:
+  adguard_config_template:
+    file: ./config/AdGuardHome.yaml.template
+
 volumes:
   adguard-work:
   adguard-conf:
+
 networks:
   traefik-public:
     external: true

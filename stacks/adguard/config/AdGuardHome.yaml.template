@@ -1,0 +1,205 @@
+bind_host: 0.0.0.0
+bind_port: 80
+users:
+  - name: {{USERNAME}}
+    password: {{PASSWORD_HASH}}
+
+auth_attempts: 5
+block_auth_min: 15
+
+http_proxy: ""
+language: en
+theme: auto
+
+dns:
+  bind_hosts:
+    - 0.0.0.0
+  port: 53
+  
+  statistics_interval: 90
+  
+  querylog_enabled: true
+  querylog_file_enabled: true
+  querylog_interval: 2160h
+  querylog_size_memory: 1000
+  
+  anonymize_client_ip: false
+  
+  protection_enabled: true
+  blocking_mode: default
+  blocking_ipv4: ""
+  blocking_ipv6: ""
+  blocked_response_ttl: 10
+  
+  parental_block_host: family-block.dns.adguard.com
+  safebrowsing_block_host: standard-block.dns.adguard.com
+  
+  ratelimit: 20
+  ratelimit_whitelist: []
+  refuse_any: true
+  
+  upstream_dns:
+    - https://dns.quad9.net/dns-query
+    - https://dns.cloudflare.com/dns-query
+    - tls://dns.quad9.net
+    - tls://1.1.1.1
+    - 1.1.1.1
+    - 1.0.0.1
+  
+  upstream_dns_file: ""
+  
+  bootstrap_dns:
+    - 9.9.9.9
+    - 149.112.112.112
+    - 1.1.1.1
+    - 1.0.0.1
+  
+  fallback_dns: []
+  
+  all_servers: false
+  fastest_addr: false
+  fastest_timeout: 1s
+  
+  cache_size: 4194304
+  cache_ttl_min: 0
+  cache_ttl_max: 0
+  cache_optimistic: true
+  
+  edns_client_subnet:
+    custom_ip: ""
+    enabled: false
+    use_custom: false
+  
+  enable_dnssec: true
+  
+  filtering_enabled: true
+  filters_update_interval: 24
+  
+  parental_enabled: false
+  safesearch_enabled: false
+  safebrowsing_enabled: true
+  
+  blocked_services: []
+  
+  rewrites:
+    - domain: adguard.local
+      answer: 192.168.99.101
+    - domain: traefik.local
+      answer: 192.168.99.101
+    - domain: git.local
+      answer: 192.168.99.101
+    - domain: grafana.local
+      answer: 192.168.99.101
+    - domain: prometheus.local
+      answer: 192.168.99.101
+    - domain: vault.local
+      answer: 192.168.99.101
+  
+  allowed_clients: []
+  disallowed_clients: []
+  blocked_hosts: []
+  
+  dhcp:
+    enabled: false
+
+tls:
+  enabled: false
+  server_name: ""
+  force_https: false
+  port_https: 443
+  port_dns_over_tls: 853
+  port_dns_over_quic: 784
+  allow_unencrypted_doh: false
+
+filters:
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_1.txt
+    name: AdGuard DNS filter
+    id: 1
+  
+  - enabled: true
+    url: https://adguardteam.github.io/HostlistsRegistry/assets/filter_2.txt
+    name: AdAway Default Blocklist
+    id: 2
+  
+  - enabled: true
+    url: https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts
+    name: Steven Black's Unified Hosts
+    id: 3
+  
+  - enabled: true
+    url: https://raw.githubusercontent.com/PolishFiltersTeam/KADhosts/master/KADhosts.txt
+    name: KADhosts
+    id: 4
+  
+  - enabled: true
+    url: https://raw.githubusercontent.com/FadeMind/hosts.extras/master/add.Spam/hosts
+    name: Anti-spam
+    id: 5
+  
+  - enabled: true
+    url: https://v.firebog.net/hosts/static/w3kbl.txt
+    name: Firebog - W3KBL
+    id: 6
+  
+  - enabled: true
+    url: https://raw.githubusercontent.com/matomo-org/referrer-spam-blacklist/master/spammers.txt
+    name: Matomo Referrer Spam
+    id: 7
+  
+  - enabled: true
+    url: https://someonewhocares.org/hosts/zero/hosts
+    name: Dan Pollock's List
+    id: 8
+  
+  - enabled: true
+    url: https://raw.githubusercontent.com/VeleSila/yhosts/master/hosts
+    name: RPiList Malware
+    id: 9
+  
+  - enabled: true
+    url: https://big.oisd.nl/
+    name: OISD Big List
+    id: 10
+  
+  - enabled: true
+    url: https://urlhaus.abuse.ch/downloads/hostfile/
+    name: URLhaus Malware
+    id: 11
+
+whitelist_filters:
+  - enabled: true
+    url: https://raw.githubusercontent.com/anudeepND/whitelist/master/domains/whitelist.txt
+    name: Commonly Whitelisted Domains
+    id: 1
+
+user_rules:
+  - '||analytics.google.com^'
+  - '||googleadservices.com^'
+  - '||doubleclick.net^'
+  - '@@||github.com^$important'
+  - '@@||githubusercontent.com^$important'
+
+clients:
+  runtime_sources:
+    whois: true
+    arp: true
+    rdns: true
+    dhcp: true
+    hosts: true
+  persistent: []
+
+log_file: ""
+log_max_backups: 0
+log_max_size: 100
+log_max_age: 3
+log_compress: false
+log_localtime: false
+verbose: false
+
+os:
+  group: ""
+  user: ""
+  rlimit_nofile: 0
+
+schema_version: 20
