@@ -21,7 +21,7 @@ services:
       - adguard-conf:/opt/adguardhome/conf
     configs:
       - source: adguard_config_template
-        target: /tmp/AdGuardHome.yaml.example
+        target: /tmp/AdGuardHome.yaml.template
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
