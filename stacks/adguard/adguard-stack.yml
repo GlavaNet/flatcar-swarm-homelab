@@ -19,6 +19,16 @@ services:
     volumes:
       - adguard-work:/opt/adguardhome/work
       - adguard-conf:/opt/adguardhome/conf
+    configs:
+      - source: adguard_config_template
+        target: /tmp/AdGuardHome.yaml.template
+    command: >
+      sh -c "
+      if [ ! -f /opt/adguardhome/conf/AdGuardHome.yaml ]; then
+        cp /tmp/AdGuardHome.yaml.template /opt/adguardhome/conf/AdGuardHome.yaml
+      fi &&
+      /opt/adguardhome/AdGuardHome --no-check-update -c /opt/adguardhome/conf/AdGuardHome.yaml -w /opt/adguardhome/work
+      "
     networks:
       - traefik-public
     deploy:
@@ -32,6 +42,10 @@ services:
 volumes:
   adguard-work:
   adguard-conf:
+
+configs:
+  adguard_config_template:
+    file: ./AdGuardHome.yaml.example
 
 networks:
   traefik-public:
