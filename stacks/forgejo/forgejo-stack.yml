@@ -3,14 +3,12 @@ version: '3.8'
 services:
   forgejo:
     image: codeberg.org/forgejo/forgejo:1.21
-    ports:
-      - "3000:3000"
     environment:
       - USER_UID=1000
       - USER_GID=1000
       - FORGEJO__database__DB_TYPE=sqlite3
       - FORGEJO__server__DOMAIN=git.local
-      - FORGEJO__server__ROOT_URL=http://192.168.99.101:3000
+      - FORGEJO__server__ROOT_URL=http://git.local
       - FORGEJO__server__HTTP_PORT=3000
       - FORGEJO__webhook__ALLOWED_HOST_LIST=private
       - FORGEJO__actions__ENABLED=true
@@ -28,10 +26,8 @@ services:
         - "traefik.http.routers.forgejo.rule=Host(`git.local`)"
         - "traefik.http.services.forgejo.loadbalancer.server.port=3000"
 
-
 volumes:
   forgejo-data:
-
 
 networks:
   traefik-public:
