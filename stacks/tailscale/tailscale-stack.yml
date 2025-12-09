@@ -3,7 +3,7 @@ version: '3.8'
 services:
   router:
     image: tailscale/tailscale:latest
-    hostname: swarm-manager-1
+    hostname: "{{.Node.Hostname}}"
     environment:
       - TS_AUTHKEY_FILE=/run/secrets/tailscale_auth_key
       - TS_STATE_DIR=/var/lib/tailscale
@@ -11,6 +11,7 @@ services:
       - TS_ROUTES=192.168.99.0/24
       - TS_EXTRA_ARGS=--advertise-exit-node --advertise-tags=tag:homelab
       - TS_ACCEPT_DNS=true
+      - TS_HOSTNAME={{.Node.Hostname}}
     volumes:
       - tailscale-state:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
@@ -23,11 +24,11 @@ services:
       - tailscale
     deploy:
       mode: replicated
-      replicas: 1
+      replicas: 3  # One per manager
       placement:
         constraints:
           - node.role == manager
-          - node.hostname == swarm-manager-1
+        max_replicas_per_node: 1  # Prevent multiple on same node
       restart_policy:
         condition: on-failure
         delay: 5s
