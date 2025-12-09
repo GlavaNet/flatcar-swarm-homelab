@@ -4,38 +4,36 @@ services:
   router:
     image: tailscale/tailscale:latest
     hostname: "{{.Node.Hostname}}"
-    environment:
-      - TS_AUTHKEY_FILE=/run/secrets/tailscale_auth_key
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_USERSPACE=false
-      - TS_ROUTES=192.168.99.0/24
-      - TS_EXTRA_ARGS=--advertise-exit-node --advertise-tags=tag:homelab
-      - TS_ACCEPT_DNS=true
-      - TS_HOSTNAME={{.Node.Hostname}}
+    secrets:
+      - tailscale_auth_key
     volumes:
       - tailscale-state:/var/lib/tailscale
       - /dev/net/tun:/dev/net/tun
-    secrets:
-      - tailscale_auth_key
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
+    environment:
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_USERSPACE=false
+      - TS_ROUTES=192.168.99.0/24
+      - TS_EXTRA_ARGS=--advertise-exit-node --reset
+      - TS_ACCEPT_DNS=true
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        export TS_AUTHKEY=$$(cat /run/secrets/tailscale_auth_key)
+        exec /usr/local/bin/containerboot
     networks:
       - tailscale
     deploy:
-      mode: replicated
-      replicas: 3  # One per manager
+      mode: global
       placement:
         constraints:
           - node.role == manager
-        max_replicas_per_node: 1  # Prevent multiple on same node
       restart_policy:
         condition: on-failure
         delay: 5s
-        max_attempts: 5
-      labels:
-        - "com.tailscale.role=subnet-router"
-        - "com.tailscale.role=exit-node"
+        max_attempts: 3
 
 secrets:
   tailscale_auth_key:
@@ -43,10 +41,7 @@ secrets:
 
 volumes:
   tailscale-state:
-    driver: local
 
 networks:
   tailscale:
     driver: overlay
-    name: tailscale
-    attachable: true
