@@ -45,13 +45,24 @@ echo "Waiting for Forgejo to start..."
 sleep 30
 
 echo "Configuring Forgejo mirror sync..."
+cat > /tmp/forgejo-sync.sh << 'SCRIPT'
+#!/bin/bash
+CONTAINER=$(docker ps -q -f name=forgejo_forgejo)
+if [ -n "$CONTAINER" ]; then
+  docker exec "$CONTAINER" su git -c "forgejo admin mirror-sync"
+fi
+SCRIPT
+
+sudo mv /tmp/forgejo-sync.sh /opt/bin/forgejo-sync.sh
+sudo chmod +x /opt/bin/forgejo-sync.sh
+
 sudo tee /etc/systemd/system/forgejo-mirror-sync.service > /dev/null << 'SERVICE'
 [Unit]
 Description=Sync Forgejo mirrors from GitHub
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/docker exec $(docker ps -q -f name=forgejo_forgejo) su git -c "forgejo admin mirror-sync"
+ExecStart=/opt/bin/forgejo-sync.sh
 SERVICE
 
 sudo tee /etc/systemd/system/forgejo-mirror-sync.timer > /dev/null << 'TIMER'
