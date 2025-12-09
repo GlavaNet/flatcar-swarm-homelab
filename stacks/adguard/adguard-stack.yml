@@ -26,7 +26,7 @@ services:
     command:
       - |
         if [ ! -f /opt/adguardhome/conf/AdGuardHome.yaml ]; then
-          cp /tmp/AdGuardHome.yaml.example /opt/adguardhome/conf/AdGuardHome.yaml
+          cp /tmp/AdGuardHome.yaml.template /opt/adguardhome/conf/AdGuardHome.yaml
         fi
         exec /opt/adguardhome/AdGuardHome --no-check-update -c /opt/adguardhome/conf/AdGuardHome.yaml -w /opt/adguardhome/work
     networks:
