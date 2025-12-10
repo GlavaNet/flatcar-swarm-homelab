@@ -1,5 +1,10 @@
 bind_host: 0.0.0.0
 bind_port: 80
+
+http:
+  address: 0.0.0.0:80
+  session_ttl: 720h
+
 users:
   - name: {{USERNAME}}
     password: {{PASSWORD_HASH}}
@@ -8,6 +13,7 @@ auth_attempts: 5
 block_auth_min: 15
 
 trusted_proxies:
+  - 127.0.0.0/8
   - 10.0.0.0/8
   - 172.16.0.0/12
   - 192.168.0.0/16
