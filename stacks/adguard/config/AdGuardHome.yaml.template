@@ -103,7 +103,11 @@ dns:
       answer: 192.168.99.101
     - domain: prometheus.local
       answer: 192.168.99.101
+    - domain: alertmanager.local
+      answer: 192.168.99.101
     - domain: vault.local
+      answer: 192.168.99.101
+    - domain: ntfy.local
       answer: 192.168.99.101
   
   allowed_clients: []

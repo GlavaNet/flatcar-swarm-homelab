@@ -6,9 +6,11 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.retention.time=7d'
+      - '--web.enable-lifecycle'
     volumes:
       - prometheus-data:/prometheus
       - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
     networks:
       - traefik-public
       - monitoring
@@ -20,12 +22,32 @@ services:
         - "traefik.http.routers.prometheus.rule=Host(`prometheus.local`)"
         - "traefik.http.services.prometheus.loadbalancer.server.port=9090"
 
+  alertmanager:
+    image: prom/alertmanager:latest
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - alertmanager-data:/alertmanager
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - traefik-public
+      - monitoring
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.alertmanager.rule=Host(`alertmanager.local`)"
+        - "traefik.http.services.alertmanager.loadbalancer.server.port=9093"
+
   grafana:
     image: grafana/grafana:latest
     volumes:
       - grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
     networks:
       - traefik-public
       - monitoring
@@ -66,6 +88,7 @@ services:
 
 volumes:
   prometheus-data:
+  alertmanager-data:
   grafana-data:
 
 networks:

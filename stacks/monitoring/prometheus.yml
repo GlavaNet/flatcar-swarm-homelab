@@ -1,5 +1,17 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load alert rules
+rule_files:
+  - /etc/prometheus/alert-rules.yml
 
 scrape_configs:
   - job_name: 'prometheus'
@@ -18,13 +30,16 @@ scrape_configs:
         type: 'A'
         port: 8080
 
-  # Add Traefik metrics
   - job_name: 'traefik'
     static_configs:
       - targets: ['traefik:8080']
     metrics_path: '/metrics'
 
-  # Add Docker Swarm metrics
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+
+  # Docker Swarm service discovery (if using Docker Engine metrics)
   - job_name: 'dockerswarm'
     static_configs:
       - targets: ['node-exporter:9100']

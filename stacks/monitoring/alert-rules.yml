@@ -1,0 +1,111 @@
+groups:
+  - name: swarm_cluster
+    interval: 30s
+    rules:
+      # Node availability alerts
+      - alert: SwarmNodeDown
+        expr: up{job="node"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Swarm node {{ $labels.instance }} is down"
+          description: "Node {{ $labels.instance }} has been unreachable for more than 2 minutes."
+
+      - alert: SwarmManagerDown
+        expr: count(up{job="dockerswarm",role="manager"} == 1) < 2
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Swarm manager quorum at risk"
+          description: "Only {{ $value }} manager nodes are available. Minimum 2 required for quorum."
+
+      # Service health alerts
+      - alert: ServiceReplicasMissing
+        expr: (docker_swarm_service_replicas_desired - docker_swarm_service_replicas_running) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Service {{ $labels.service_name }} has missing replicas"
+          description: "Service {{ $labels.service_name }} is missing {{ $value }} replicas for 5 minutes."
+
+      - alert: ServiceCompletelyDown
+        expr: docker_swarm_service_replicas_running == 0 and docker_swarm_service_replicas_desired > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.service_name }} is completely down"
+          description: "All replicas of {{ $labels.service_name }} are down."
+
+      # Resource alerts
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 90% on {{ $labels.instance }} (current: {{ $value }}%)"
+
+      - alert: HighDiskUsage
+        expr: (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage on {{ $labels.instance }}"
+          description: "Disk usage is above 85% on {{ $labels.instance }} (current: {{ $value }}%)"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 80% on {{ $labels.instance }} for 10 minutes (current: {{ $value }}%)"
+
+  - name: docker_alerts
+    interval: 30s
+    rules:
+      - alert: ContainerKilled
+        expr: time() - container_last_seen{name!~".*_agent.*"} > 60
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} killed"
+          description: "Container {{ $labels.name }} on {{ $labels.instance }} has disappeared."
+
+      - alert: VolumeSpaceUsage
+        expr: (1 - (docker_volume_usage_bytes / docker_volume_size_bytes)) * 100 < 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Docker volume {{ $labels.volume }} low on space"
+          description: "Volume {{ $labels.volume }} has less than 10% free space remaining."
+
+  - name: traefik_alerts
+    interval: 30s
+    rules:
+      - alert: TraefikDown
+        expr: up{job="traefik"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Traefik reverse proxy is down"
+          description: "Traefik has been down for more than 2 minutes. External access unavailable."
+
+      - alert: TraefikHighErrorRate
+        expr: rate(traefik_entrypoint_requests_total{code=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate in Traefik"
+          description: "Traefik is experiencing elevated 5xx errors ({{ $value }} errors/sec)"
