@@ -47,7 +47,28 @@ services:
         
         echo "Configuration generated successfully"
         
-        echo "=== Starting AdGuard Home ==="
+        # Start AdGuard in background to let it do migrations
+        echo "=== Starting AdGuard Home for initial migration ==="
+        /opt/adguardhome/AdGuardHome --no-check-update -c /opt/adguardhome/conf/AdGuardHome.yaml -w /opt/adguardhome/work &
+        AGH_PID=$$!
+        
+        # Wait for it to start and migrate
+        sleep 10
+        
+        # Stop AdGuard
+        kill $$AGH_PID
+        sleep 5
+        
+        # Now fix the session_ttl after migration
+        echo "Fixing session_ttl after migration..."
+        sed -i 's/session_ttl: 0s/session_ttl: 720h/' /opt/adguardhome/conf/AdGuardHome.yaml
+        
+        # Verify
+        echo "Session TTL after fix:"
+        grep session_ttl /opt/adguardhome/conf/AdGuardHome.yaml
+        
+        # Start AdGuard for real
+        echo "=== Starting AdGuard Home (final) ==="
         exec /opt/adguardhome/AdGuardHome --no-check-update -c /opt/adguardhome/conf/AdGuardHome.yaml -w /opt/adguardhome/work
     networks:
       - traefik-public
