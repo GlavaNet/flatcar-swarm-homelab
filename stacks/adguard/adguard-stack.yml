@@ -26,7 +26,7 @@ services:
       - adguard_username
       - adguard_password_hash
     configs:
-      - source: adguard_config_v2
+      - source: adguard_config_v3
         target: /tmp/AdGuardHome.yaml.template
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -101,7 +101,7 @@ volumes:
   adguard-conf:
 
 configs:
-  adguard_config_v2:
+  adguard_config_v3:
     file: ./config/AdGuardHome.yaml.template
 
 networks:
