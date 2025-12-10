@@ -29,14 +29,14 @@ services:
     command:
       - |
         # Read secrets
-        USERNAME=$(cat /run/secrets/adguard_username)
-        PASSWORD_HASH=$(cat /run/secrets/adguard_password_hash)
+        USERNAME=$$(cat /run/secrets/adguard_username)
+        PASSWORD_HASH=$$(cat /run/secrets/adguard_password_hash)
         
         # Generate config if it doesn't exist
         if [ ! -f /opt/adguardhome/conf/AdGuardHome.yaml ]; then
           # Replace placeholders in template
-          sed -e "s|{{USERNAME}}|$${USERNAME}|g" \
-              -e "s|{{PASSWORD_HASH}}|$${PASSWORD_HASH}|g" \
+          sed -e "s|{{USERNAME}}|$$USERNAME|g" \
+              -e "s|{{PASSWORD_HASH}}|$$PASSWORD_HASH|g" \
               /tmp/AdGuardHome.yaml.template > /opt/adguardhome/conf/AdGuardHome.yaml
           echo "Generated AdGuardHome.yaml from template"
         fi
