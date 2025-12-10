@@ -12,12 +12,6 @@ users:
 auth_attempts: 5
 block_auth_min: 15
 
-trusted_proxies:
-  - 127.0.0.0/8
-  - 10.0.0.0/8
-  - 172.16.0.0/12
-  - 192.168.0.0/16
-
 http_proxy: ""
 language: en
 theme: auto
@@ -48,6 +42,12 @@ dns:
   ratelimit: 20
   ratelimit_whitelist: []
   refuse_any: true
+
+  trusted_proxies:
+    - 127.0.0.0/8
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
   
   upstream_dns:
     - https://dns.quad9.net/dns-query
