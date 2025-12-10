@@ -9,8 +9,11 @@ services:
       - '--web.enable-lifecycle'
     volumes:
       - prometheus-data:/prometheus
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./alert-rules.yml:/etc/prometheus/alert-rules.yml:ro
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+      - source: alert_rules
+        target: /etc/prometheus/alert-rules.yml
     networks:
       - traefik-public
       - monitoring
@@ -29,7 +32,9 @@ services:
       - '--storage.path=/alertmanager'
     volumes:
       - alertmanager-data:/alertmanager
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    configs:
+      - source: alertmanager_config
+        target: /etc/alertmanager/alertmanager.yml
     networks:
       - traefik-public
       - monitoring
@@ -90,6 +95,14 @@ volumes:
   prometheus-data:
   alertmanager-data:
   grafana-data:
+
+configs:
+  prometheus_config:
+    file: ./prometheus.yml
+  alert_rules:
+    file: ./alert-rules.yml
+  alertmanager_config:
+    file: ./alertmanager.yml
 
 networks:
   traefik-public:
