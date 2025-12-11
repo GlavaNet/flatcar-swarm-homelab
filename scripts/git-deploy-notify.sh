@@ -21,33 +21,36 @@ send_notification() {
          "${NTFY_URL}" 2>/dev/null || true
 }
 
-# Send starting notification
+cd "$REPO_DIR"
+
+# Fetch changes
+git fetch origin
+
+# Check if there are new commits
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
+
+if [ "$LOCAL" = "$REMOTE" ]; then
+    # No changes, exit silently
+    exit 0
+fi
+
+# There are changes, send notification and deploy
 send_notification \
     "GitOps: Deployment Starting" \
     "Pulling latest changes from repository..." \
     "default" \
     "rocket"
 
-cd "$REPO_DIR"
+git reset --hard origin/main
+CURRENT_HASH=$(git rev-parse --short HEAD)
+COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
 
-# Pull changes
-if git fetch origin && git reset --hard origin/main; then
-    CURRENT_HASH=$(git rev-parse --short HEAD)
-    COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
-    
-    send_notification \
-        "GitOps: Repository Updated" \
-        "Commit: ${CURRENT_HASH} - ${COMMIT_MSG}" \
-        "default" \
-        "git"
-else
-    send_notification \
-        "GitOps: Git Pull Failed" \
-        "Failed to pull changes from origin/main" \
-        "urgent" \
-        "x,git"
-    exit 1
-fi
+send_notification \
+    "GitOps: Repository Updated" \
+    "Commit: ${CURRENT_HASH} - ${COMMIT_MSG}" \
+    "default" \
+    "git"
 
 # Deploy services
 if bash scripts/deploy-services.sh > "$LOG_FILE" 2>&1; then
@@ -57,7 +60,6 @@ if bash scripts/deploy-services.sh > "$LOG_FILE" 2>&1; then
         "default" \
         "white_check_mark,rocket"
 else
-    ERROR_LOG=$(tail -20 "$LOG_FILE")
     send_notification \
         "GitOps: Deployment Failed" \
         "Deployment failed for commit ${CURRENT_HASH}. Check logs on manager-1." \
