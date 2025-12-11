@@ -47,3 +47,7 @@ scrape_configs:
       - source_labels: [__name__]
         regex: 'docker_swarm.*'
         action: keep
+
+  - job_name: 'adguard'
+    static_configs:
+      - targets: ['adguard:80']
