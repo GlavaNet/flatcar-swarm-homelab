@@ -5,6 +5,7 @@ set -e
 
 NTFY_URL="${NTFY_TOPIC_URL:-http://ntfy.local/swarm-alerts}"
 REPO_DIR="/home/core/flatcar-swarm-homelab"
+LOG_FILE="/home/core/deploy.log"
 
 # Function to send notification
 send_notification() {
@@ -49,14 +50,14 @@ else
 fi
 
 # Deploy services
-if bash scripts/deploy-services.sh > /tmp/deploy.log 2>&1; then
+if bash scripts/deploy-services.sh > "$LOG_FILE" 2>&1; then
     send_notification \
         "GitOps: Deployment Successful" \
         "All services deployed successfully. Commit: ${CURRENT_HASH}" \
         "default" \
         "white_check_mark,rocket"
 else
-    ERROR_LOG=$(tail -20 /tmp/deploy.log)
+    ERROR_LOG=$(tail -20 "$LOG_FILE")
     send_notification \
         "GitOps: Deployment Failed" \
         "Deployment failed for commit ${CURRENT_HASH}. Check logs on manager-1." \
