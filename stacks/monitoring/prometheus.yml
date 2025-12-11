@@ -23,6 +23,12 @@ scrape_configs:
       - names: ['tasks.node-exporter']
         type: 'A'
         port: 9100
+    relabel_configs:
+      # Extract hostname from DNS name
+      - source_labels: [__meta_dns_name]
+        regex: '(.+)'
+        target_label: instance
+        replacement: '$1'
 
   - job_name: 'cadvisor'
     dns_sd_configs:
