@@ -71,15 +71,6 @@ groups:
   - name: docker_alerts
     interval: 30s
     rules:
-      - alert: ContainerKilled
-        expr: time() - container_last_seen{name!~".*_agent.*"} > 60
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Container {{ $labels.name }} killed"
-          description: "Container {{ $labels.name }} on {{ $labels.instance }} has disappeared."
-
       - alert: VolumeSpaceUsage
         expr: (1 - (docker_volume_usage_bytes / docker_volume_size_bytes)) * 100 < 10
         for: 5m
