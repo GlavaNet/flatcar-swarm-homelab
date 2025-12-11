@@ -100,7 +100,7 @@ services:
 
   # NEW: Docker Swarm metrics exporter
   dockerswarm-exporter:
-    image: ghcr.io/42wim/dockerswarm-exporter:latest
+    image: rycus86/dockerswarm-exporter:latest
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
