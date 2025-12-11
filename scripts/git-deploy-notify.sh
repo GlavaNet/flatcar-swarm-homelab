@@ -5,7 +5,7 @@ set -e
 
 NTFY_URL="${NTFY_TOPIC_URL:-http://ntfy.local/swarm-alerts}"
 REPO_DIR="/home/core/flatcar-swarm-homelab"
-LOG_FILE="/home/core/deploy.log"
+LOG_FILE="/var/log/deploy.log"
 
 # Function to send notification
 send_notification() {
