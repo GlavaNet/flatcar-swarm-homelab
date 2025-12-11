@@ -346,7 +346,7 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "avg(100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100))",
+          "expr": "avg((sum by(instance) (rate(node_cpu_seconds_total{mode!=\"idle\",job=\"node\"}[1m])) / sum by(instance) (rate(node_cpu_seconds_total{job=\"node\"}[1m]))) * 100)",
           "refId": "A"
         }
       ],
@@ -506,7 +506,7 @@
           "refId": "A"
         },
         {
-          "expr": "100 - (avg by(instance,job) (rate(node_cpu_seconds_total{mode=\"idle\",job=\"node\"}[5m])) * 100)",
+          "expr": "(sum by(instance) (rate(node_cpu_seconds_total{mode!=\"idle\",job=\"node\"}[1m])) / sum by(instance) (rate(node_cpu_seconds_total{job=\"node\"}[1m]))) * 100",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -534,7 +534,13 @@
           "id": "filterFieldsByName",
           "options": {
             "include": {
-              "names": ["instance", "Value #A", "Value #B", "Value #C", "Value #D"]
+              "names": [
+                "instance",
+                "Value #A",
+                "Value #B",
+                "Value #C",
+                "Value #D"
+              ]
             }
           }
         },
@@ -1398,11 +1404,11 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "avg(node_hwmon_temp_celsius)",
+          "expr": "vector(0)",
           "refId": "A"
         }
       ],
-      "title": "Average Temperature",
+      "title": "REMOVED - No Temperature Data",
       "type": "gauge"
     },
     {
@@ -1449,7 +1455,7 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "min(node_boot_time_seconds)",
+          "expr": "time() - min(node_boot_time_seconds)",
           "refId": "A"
         }
       ],

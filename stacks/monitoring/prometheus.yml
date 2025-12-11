@@ -2,14 +2,12 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
         - targets:
             - alertmanager:9093
 
-# Load alert rules
 rule_files:
   - /etc/prometheus/alert-rules.yml
 
@@ -24,7 +22,6 @@ scrape_configs:
         type: 'A'
         port: 9100
     relabel_configs:
-      # Extract hostname from DNS name
       - source_labels: [__meta_dns_name]
         regex: '(.+)'
         target_label: instance
@@ -48,10 +45,9 @@ scrape_configs:
     static_configs:
       - targets: ['alertmanager:9093']
 
-  # Custom Swarm exporter
   - job_name: 'swarm-exporter'
     static_configs:
-      - targets: ['swarm-exporter:9099']
+      - targets: ['tasks.monitoring_swarm-exporter:9099']
 
   - job_name: 'adguard'
     static_configs:
