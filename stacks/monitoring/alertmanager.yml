@@ -21,17 +21,17 @@ route:
 receivers:
   - name: 'ntfy-critical'
     webhook_configs:
-      - url: 'http://ntfy:80/swarm-alerts?title=CRITICAL:%20Swarm%20Alert&priority=urgent&tags=rotating_light'
+      - url: 'https://ntfy.sh/swarm-6c7d3e5bf293-alerts?title=CRITICAL:%20Swarm%20Alert&priority=urgent&tags=rotating_light'
         send_resolved: true
 
   - name: 'ntfy-warning'
     webhook_configs:
-      - url: 'http://ntfy:80/swarm-alerts?title=WARNING:%20Swarm%20Alert&priority=high&tags=warning'
+      - url: 'https://ntfy.sh/swarm-6c7d3e5bf293-alerts?title=WARNING:%20Swarm%20Alert&priority=high&tags=warning'
         send_resolved: true
 
   - name: 'ntfy-info'
     webhook_configs:
-      - url: 'http://ntfy:80/swarm-alerts?title=INFO:%20Swarm%20Alert&priority=default&tags=information_source'
+      - url: 'https://ntfy.sh/swarm-6c7d3e5bf293-alerts?title=INFO:%20Swarm%20Alert&priority=default&tags=information_source'
         send_resolved: true
 
 inhibit_rules:

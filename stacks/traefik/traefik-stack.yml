@@ -13,6 +13,7 @@ services:
       - "--entrypoints.websecure.address=:443"
       - "--log.level=INFO"
       - "--accesslog=true"
+      - "--metrics.prometheus=true"
     ports:
       - "80:80"
       - "443:443"

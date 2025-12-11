@@ -3,7 +3,7 @@
 
 set -e
 
-NTFY_URL="http://192.168.99.101/swarm-alerts"
+NTFY_URL="https://ntfy.sh/swarm-6c7d3e5bf293-alerts"
 REPO_DIR="/home/core/flatcar-swarm-homelab"
 
 # Function to send notification

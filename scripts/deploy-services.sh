@@ -22,7 +22,7 @@ send_notification() {
              -H "Priority: ${priority}" \
              -H "Tags: ${tags}" \
              -d "${message}" \
-             "http://ntfy.local/swarm-alerts" 2>/dev/null || true
+             "https://ntfy.sh/swarm-6c7d3e5bf293-alerts" 2>/dev/null || true
     fi
 }
 
