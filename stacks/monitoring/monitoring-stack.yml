@@ -104,38 +104,29 @@ services:
       - sh
       - -c
       - |
-        apk add --no-cache docker-cli bash netcat-openbsd
-        cat > /exporter.sh << 'SCRIPT'
-        #!/bin/bash
-        generate_metrics() {
-            echo "# HELP swarm_node_info Node information"
-            echo "# TYPE swarm_node_info gauge"
-            docker node ls --format '{{.Hostname}} {{.ManagerStatus}}' 2>/dev/null | while read hostname manager; do
-                role="worker"
-                [ -n "$$manager" ] && role="manager"
-                echo "swarm_node_info{hostname=\"$$hostname\",role=\"$$role\"} 1"
-            done
-            echo ""
-            echo "# HELP swarm_service_replicas_running Running replicas"
-            echo "# TYPE swarm_service_replicas_running gauge"
-            echo "# HELP swarm_service_replicas_desired Desired replicas"
-            echo "# TYPE swarm_service_replicas_desired gauge"
-            docker service ls --format '{{.Name}} {{.Replicas}}' 2>/dev/null | while read name replicas; do
-                running=$${replicas%/*}
-                desired=$${replicas#*/}
-                echo "swarm_service_replicas_running{service_name=\"$$name\"} $$running"
-                echo "swarm_service_replicas_desired{service_name=\"$$name\"} $$desired"
-            done
-        }
+        apk add --no-cache docker-cli socat
         while true; do
-            (
-                echo -ne "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\n"
-                generate_metrics
-            ) | nc -l -p 9099 -q 1
+          echo "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n" > /tmp/header
+          echo "# HELP swarm_node_info Node information" > /tmp/metrics
+          echo "# TYPE swarm_node_info gauge" >> /tmp/metrics
+          docker node ls --format '{{.Hostname}} {{.ManagerStatus}}' 2>/dev/null | while read hostname manager; do
+            role="worker"
+            [ -n "$$manager" ] && role="manager"
+            echo "swarm_node_info{hostname=\"$$hostname\",role=\"$$role\"} 1" >> /tmp/metrics
+          done
+          echo "" >> /tmp/metrics
+          echo "# HELP swarm_service_replicas_running Running replicas" >> /tmp/metrics
+          echo "# TYPE swarm_service_replicas_running gauge" >> /tmp/metrics
+          echo "# HELP swarm_service_replicas_desired Desired replicas" >> /tmp/metrics
+          echo "# TYPE swarm_service_replicas_desired gauge" >> /tmp/metrics
+          docker service ls --format '{{.Name}} {{.Replicas}}' 2>/dev/null | while read name replicas; do
+            running=$${replicas%/*}
+            desired=$${replicas#*/}
+            echo "swarm_service_replicas_running{service_name=\"$$name\"} $$running" >> /tmp/metrics
+            echo "swarm_service_replicas_desired{service_name=\"$$name\"} $$desired" >> /tmp/metrics
+          done
+          cat /tmp/header /tmp/metrics | socat -T1 TCP-LISTEN:9099,fork,reuseaddr -
         done
-        SCRIPT
-        chmod +x /exporter.sh
-        /exporter.sh
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
