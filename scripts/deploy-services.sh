@@ -10,9 +10,14 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deployment"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 
-# Function to send ntfy notification (if ntfy is deployed)
+# Load environment variables
+if [ -f /etc/environment ]; then
+    source /etc/environment
+fi
+
+# Function to send ntfy notification
 send_notification() {
-    if [ "$NTFY_ENABLED" = "true" ]; then
+    if [ "$NTFY_ENABLED" = "true" ] && [ -n "$NTFY_TOPIC_URL" ]; then
         local title="$1"
         local message="$2"
         local priority="${3:-default}"
@@ -22,7 +27,7 @@ send_notification() {
              -H "Priority: ${priority}" \
              -H "Tags: ${tags}" \
              -d "${message}" \
-             "https://ntfy.sh/swarm-6c7d3e5bf293-alerts" 2>/dev/null || true
+             "${NTFY_TOPIC_URL}" 2>/dev/null || true
     fi
 }
 
@@ -61,21 +66,15 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Traefik (reverse proxy)..."
 docker stack deploy -c stacks/traefik/traefik-stack.yml traefik
 sleep 5
 
-# Deploy ntfy early so other services can send notifications
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying ntfy (notification service)..."
-if docker stack deploy -c stacks/ntfy/ntfy-stack.yml ntfy; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] ntfy deployed, waiting 10 seconds for service to start..."
-    sleep 10
-    # Check if ntfy is accessible
-    if curl -s http://ntfy.local > /dev/null 2>&1 || curl -s http://192.168.99.101 > /dev/null 2>&1; then
+# Check if ntfy is accessible (self-hosted or public)
+if [ -n "$NTFY_TOPIC_URL" ]; then
+    if curl -s --max-time 5 "${NTFY_TOPIC_URL}" > /dev/null 2>&1; then
         NTFY_ENABLED=true
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] ntfy is accessible, notifications enabled"
         send_notification "Deployment Started" "Cluster deployment in progress..." "default" "rocket"
     else
-        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ntfy not yet accessible, notifications disabled"
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ntfy not accessible, notifications disabled"
     fi
-else
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Warning: ntfy deployment failed, continuing without notifications"
 fi
 
 # Deploy Tailscale (optional VPN access)
@@ -91,6 +90,15 @@ docker stack deploy -c stacks/forgejo/forgejo-stack.yml forgejo
 send_notification "Forgejo Deployed" "Git server is running" "default" "git"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Monitoring (Prometheus + Grafana + Alertmanager)..."
+
+# Substitute ntfy URL in alertmanager config before deploying
+if [ -n "$NTFY_TOPIC_URL" ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuring Alertmanager with ntfy URL..."
+    sed "s|{{NTFY_TOPIC_URL}}|$NTFY_TOPIC_URL|g" \
+        stacks/monitoring/alertmanager.yml > /tmp/alertmanager.yml.tmp
+    mv /tmp/alertmanager.yml.tmp stacks/monitoring/alertmanager.yml
+fi
+
 docker stack deploy -c stacks/monitoring/monitoring-stack.yml monitoring
 send_notification "Monitoring Deployed" "Prometheus, Grafana, and Alertmanager are running" "default" "chart_with_upwards_trend"
 sleep 5
@@ -112,7 +120,6 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 echo ""
 echo "Services deployed:"
 echo "  ✓ Traefik       - http://traefik.local"
-echo "  ✓ ntfy          - http://ntfy.local"
 if [ "$SKIP_TAILSCALE" != "true" ]; then
     echo "  ✓ Tailscale     - Check admin console"
 fi
@@ -135,8 +142,9 @@ echo ""
 # Send final success notification
 send_notification "Deployment Complete" "All services deployed successfully! ✅" "default" "white_check_mark,rocket"
 
-# Display alert configuration reminder
-if [ "$NTFY_ENABLED" = "true" ]; then
+# Display notification setup reminder
+if [ "$NTFY_ENABLED" = "true" ] && [[ "$NTFY_TOPIC_URL" == *"ntfy.sh"* ]]; then
+    TOPIC_NAME=$(echo "$NTFY_TOPIC_URL" | sed 's|https://ntfy.sh/||' | sed 's|?.*||')
     echo "================================="
     echo "ntfy Notifications Setup"
     echo "================================="
@@ -144,11 +152,11 @@ if [ "$NTFY_ENABLED" = "true" ]; then
     echo "To receive mobile notifications:"
     echo "  1. Install ntfy app (iOS/Android)"
     echo "  2. Add subscription:"
-    echo "     - Server: http://ntfy.local (or http://192.168.99.101)"
-    echo "     - Topic: swarm-alerts"
+    echo "     - Server: https://ntfy.sh"
+    echo "     - Topic: $TOPIC_NAME"
     echo "  3. Enable notifications in phone settings"
     echo ""
     echo "Test notification:"
-    echo "  curl -d 'Test from Swarm cluster' http://ntfy.local/swarm-alerts"
+    echo "  curl -d 'Test from Swarm cluster' $NTFY_TOPIC_URL"
     echo ""
 fi

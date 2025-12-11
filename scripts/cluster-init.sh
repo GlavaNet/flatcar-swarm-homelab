@@ -30,15 +30,7 @@ EOF
 echo "Deploying stacks..."
 cd "$REPO_DIR"
 
-# Deploy ntfy first for notifications
-if [ ! -f /home/core/.ntfy-deployed ]; then
-    echo "Deploying ntfy notification service..."
-    docker stack deploy -c stacks/ntfy/ntfy-stack.yml ntfy
-    sleep 10
-    touch /home/core/.ntfy-deployed
-fi
-
-# Only deploy other services if this is first run
+# Only deploy if this is first run (check for marker file)
 if [ ! -f /home/core/.cluster-initialized ]; then
     bash scripts/deploy-services.sh
     touch /home/core/.cluster-initialized
@@ -87,6 +79,37 @@ TIMER
 sudo systemctl daemon-reload
 sudo systemctl enable --now forgejo-mirror-sync.timer
 
+echo ""
+echo "=== ntfy Notification Configuration ==="
+echo ""
+echo "Options:"
+echo "  1. Use public ntfy.sh (works anywhere, no self-hosting)"
+echo "  2. Use local ntfy.local (requires self-hosted ntfy or VPN)"
+echo ""
+read -p "Enter choice (1 or 2) [default: 2]: " ntfy_choice
+
+if [ "$ntfy_choice" = "1" ]; then
+    echo ""
+    echo "Generate a random topic name with: echo \"swarm-\$(openssl rand -hex 6)-alerts\""
+    echo ""
+    read -p "Enter your ntfy.sh topic name (e.g., swarm-a3f8b2e1-alerts): " ntfy_topic
+    
+    if [ -z "$ntfy_topic" ]; then
+        echo "ERROR: Topic name cannot be empty"
+        exit 1
+    fi
+    
+    NTFY_URL="https://ntfy.sh/$ntfy_topic"
+    echo "Using: $NTFY_URL"
+else
+    NTFY_URL="http://ntfy.local/swarm-alerts"
+    echo "Using: $NTFY_URL"
+fi
+
+# Store in environment
+echo "NTFY_TOPIC_URL=$NTFY_URL" | sudo tee -a /etc/environment
+echo ""
+
 echo "Setting up git-poll auto-deployment with ntfy notifications..."
 
 # Copy notification script
@@ -96,13 +119,17 @@ sudo chmod +x /opt/bin/git-deploy-notify.sh
 sudo tee /etc/systemd/system/git-poll.service > /dev/null << 'SERVICE'
 [Unit]
 Description=Pull git changes and deploy with notifications
-After=docker.service ntfy.service
+After=docker.service
 
 [Service]
 Type=oneshot
 User=core
+EnvironmentFile=/etc/environment
 WorkingDirectory=/home/core/flatcar-swarm-homelab
 ExecStart=/opt/bin/git-deploy-notify.sh
+
+[Install]
+WantedBy=multi-user.target
 SERVICE
 
 sudo tee /etc/systemd/system/git-poll.timer > /dev/null << 'TIMER'
@@ -126,13 +153,21 @@ echo ""
 echo "MANUAL STEPS REQUIRED:"
 echo ""
 echo "1. Add to your local /etc/hosts:"
-echo "   192.168.99.101  git.local grafana.local prometheus.local alertmanager.local adguard.local vault.local traefik.local ntfy.local"
+echo "   192.168.99.101  git.local grafana.local prometheus.local alertmanager.local adguard.local vault.local traefik.local"
 echo ""
-echo "2. Set up ntfy on your phone:"
-echo "   - Install ntfy app (iOS/Android)"
-echo "   - Add custom server: http://ntfy.local (or http://192.168.99.101 if no DNS)"
-echo "   - Subscribe to topic: swarm-alerts"
-echo "   - Enable notifications"
+if [ "$ntfy_choice" = "1" ]; then
+    echo "2. Set up ntfy on your phone:"
+    echo "   - Install ntfy app (iOS/Android)"
+    echo "   - Server: https://ntfy.sh"
+    echo "   - Topic: $ntfy_topic"
+    echo "   - Enable notifications"
+else
+    echo "2. Set up ntfy on your phone:"
+    echo "   - Install ntfy app (iOS/Android)"
+    echo "   - Add custom server: http://ntfy.local (or http://192.168.99.101 if no DNS)"
+    echo "   - Subscribe to topic: swarm-alerts"
+    echo "   - Enable notifications"
+fi
 echo ""
 echo "3. Visit http://192.168.99.101:3000 to complete Forgejo initial setup"
 echo "   - Create admin account (username: admin recommended)"
@@ -156,8 +191,11 @@ echo "   - Prometheus: http://prometheus.local"
 echo "   - Alertmanager: http://alertmanager.local"
 echo "   - AdGuard: http://adguard.local"
 echo "   - Vaultwarden: http://vault.local"
-echo "   - ntfy: http://ntfy.local"
 echo ""
 echo "7. Test notifications:"
-echo "   curl -d 'Hello from your Swarm cluster!' http://ntfy.local/swarm-alerts"
+if [ "$ntfy_choice" = "1" ]; then
+    echo "   curl -d 'Hello from your Swarm cluster!' https://ntfy.sh/$ntfy_topic"
+else
+    echo "   curl -d 'Hello from your Swarm cluster!' http://ntfy.local/swarm-alerts"
+fi
 echo ""
