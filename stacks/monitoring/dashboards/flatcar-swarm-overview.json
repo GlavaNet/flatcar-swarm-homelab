@@ -346,7 +346,7 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "avg((sum by(instance) (rate(node_cpu_seconds_total{mode!=\"idle\",job=\"node\"}[1m])) / sum by(instance) (rate(node_cpu_seconds_total{job=\"node\"}[1m]))) * 100)",
+          "expr": "avg((sum(rate(node_cpu_seconds_total{mode!=\"idle\",job=\"node\"}[1m])) by (instance) / sum(rate(node_cpu_seconds_total{job=\"node\"}[1m])) by (instance)) * 100)",
           "refId": "A"
         }
       ],
@@ -756,7 +756,7 @@
             "mean",
             "last"
           ],
-          "displayMode": "table",
+          "displayMode": "hidden",
           "placement": "bottom"
         },
         "tooltip": {
@@ -766,7 +766,7 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+          "expr": "(sum(rate(node_cpu_seconds_total{mode!=\"idle\",job=\"node\"}[5m])) by (instance) / sum(rate(node_cpu_seconds_total{job=\"node\"}[5m])) by (instance)) * 100",
           "legendFormat": "{{instance}}",
           "refId": "A"
         }
@@ -835,7 +835,7 @@
             "mean",
             "last"
           ],
-          "displayMode": "table",
+          "displayMode": "hidden",
           "placement": "bottom"
         },
         "tooltip": {
@@ -914,7 +914,7 @@
             "mean",
             "last"
           ],
-          "displayMode": "table",
+          "displayMode": "hidden",
           "placement": "bottom"
         },
         "tooltip": {
@@ -998,7 +998,7 @@
             "mean",
             "last"
           ],
-          "displayMode": "table",
+          "displayMode": "hidden",
           "placement": "bottom"
         },
         "tooltip": {
@@ -1076,7 +1076,7 @@
             "mean",
             "last"
           ],
-          "displayMode": "table",
+          "displayMode": "hidden",
           "placement": "bottom"
         },
         "tooltip": {
@@ -1161,7 +1161,7 @@
             "last",
             "max"
           ],
-          "displayMode": "table",
+          "displayMode": "hidden",
           "placement": "bottom"
         },
         "tooltip": {
@@ -1241,7 +1241,7 @@
             "last",
             "max"
           ],
-          "displayMode": "table",
+          "displayMode": "hidden",
           "placement": "bottom"
         },
         "tooltip": {
@@ -1404,11 +1404,11 @@
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "vector(0)",
+          "expr": "avg(node_hwmon_temp_celsius)",
           "refId": "A"
         }
       ],
-      "title": "REMOVED - No Temperature Data",
+      "title": "Average Temperature",
       "type": "gauge"
     },
     {
