@@ -48,20 +48,10 @@ scrape_configs:
     static_configs:
       - targets: ['alertmanager:9093']
 
-  # NEW: Docker Swarm Exporter - provides service/task/node metrics
-  - job_name: 'dockerswarm-exporter'
+  # Custom Swarm exporter
+  - job_name: 'swarm-exporter'
     static_configs:
-      - targets: ['dockerswarm-exporter:9099']
-
-  # Optional: Docker daemon metrics (requires daemon.json config)
-  - job_name: 'docker-daemon'
-    dns_sd_configs:
-      - names: ['tasks.node-exporter']
-        type: 'A'
-        port: 9323
-    relabel_configs:
-      - source_labels: [__meta_dns_name]
-        target_label: instance
+      - targets: ['swarm-exporter:9099']
 
   - job_name: 'adguard'
     static_configs:
