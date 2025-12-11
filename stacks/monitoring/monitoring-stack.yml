@@ -50,6 +50,13 @@ services:
     image: grafana/grafana:latest
     volumes:
       - grafana-data:/var/lib/grafana
+    configs:
+      - source: grafana_datasource
+        target: /etc/grafana/provisioning/datasources/prometheus.yml
+      - source: grafana_dashboard_config
+        target: /etc/grafana/provisioning/dashboards/default.yml
+      - source: flatcar_dashboard
+        target: /etc/grafana/provisioning/dashboards/flatcar-swarm-overview.json
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_INSTALL_PLUGINS=grafana-piechart-panel
@@ -91,6 +98,20 @@ services:
     deploy:
       mode: global
 
+  # NEW: Docker Swarm metrics exporter
+  dockerswarm-exporter:
+    image: ghcr.io/42wim/dockerswarm-exporter:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - LISTEN_ADDRESS=:9099
+    networks:
+      - monitoring
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+      replicas: 1
+
 volumes:
   prometheus-data:
   alertmanager-data:
@@ -103,6 +124,12 @@ configs:
     file: ./alert-rules.yml
   alertmanager_config:
     file: ./alertmanager.yml
+  grafana_datasource:
+    file: ./provisioning/datasources/prometheus.yml
+  grafana_dashboard_config:
+    file: ./provisioning/dashboards/default.yml
+  flatcar_dashboard:
+    file: ./dashboards/flatcar-swarm-overview.json
 
 networks:
   traefik-public:
