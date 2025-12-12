@@ -752,12 +752,8 @@
       "id": 9,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "last"
-          ],
           "displayMode": "hidden",
-          "placement": "bottom"
+          "showLegend": false
         },
         "tooltip": {
           "mode": "multi"
@@ -831,12 +827,8 @@
       "id": 10,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "last"
-          ],
           "displayMode": "hidden",
-          "placement": "bottom"
+          "showLegend": false
         },
         "tooltip": {
           "mode": "multi"
@@ -910,12 +902,8 @@
       "id": 11,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "last"
-          ],
           "displayMode": "hidden",
-          "placement": "bottom"
+          "showLegend": false
         },
         "tooltip": {
           "mode": "multi"
@@ -994,12 +982,8 @@
       "id": 12,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "last"
-          ],
           "displayMode": "hidden",
-          "placement": "bottom"
+          "showLegend": false
         },
         "tooltip": {
           "mode": "multi"
@@ -1072,12 +1056,8 @@
       "id": 13,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "last"
-          ],
           "displayMode": "hidden",
-          "placement": "bottom"
+          "showLegend": false
         },
         "tooltip": {
           "mode": "multi"
@@ -1156,13 +1136,8 @@
       "id": 14,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "last",
-            "max"
-          ],
           "displayMode": "hidden",
-          "placement": "bottom"
+          "showLegend": false
         },
         "tooltip": {
           "mode": "multi"
@@ -1236,13 +1211,8 @@
       "id": 15,
       "options": {
         "legend": {
-          "calcs": [
-            "mean",
-            "last",
-            "max"
-          ],
           "displayMode": "hidden",
-          "placement": "bottom"
+          "showLegend": false
         },
         "tooltip": {
           "mode": "multi"
@@ -1375,6 +1345,14 @@
               {
                 "color": "green",
                 "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 75
               }
             ]
           },
@@ -1399,12 +1377,12 @@
         },
         "showThresholdLabels": false,
         "showThresholdMarkers": true,
-        "text": {}
+        "textMode": "value"
       },
       "pluginVersion": "9.0.0",
       "targets": [
         {
-          "expr": "avg(node_hwmon_temp_celsius)",
+          "expr": "avg(node_thermal_zone_temp)",
           "refId": "A"
         }
       ],
@@ -1565,6 +1543,119 @@
       ],
       "title": "Critical Alerts",
       "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "displayMode": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Temperature"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "celsius"
+              },
+              {
+                "id": "custom.displayMode",
+                "value": "gradient-gauge"
+              },
+              {
+                "id": "max",
+                "value": 85
+              },
+              {
+                "id": "min",
+                "value": 30
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 60
+                    },
+                    {
+                      "color": "red",
+                      "value": 75
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 44
+      },
+      "id": 21,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "9.0.0",
+      "targets": [
+        {
+          "expr": "node_thermal_zone_temp",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Node Temperatures",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "job": true,
+              "__name__": true,
+              "zone": true,
+              "type": true
+            },
+            "renameByName": {
+              "instance": "Node",
+              "Value": "Temperature"
+            }
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
   "refresh": "30s",
@@ -1587,5 +1678,9 @@
   "title": "Flatcar Swarm - Cluster Overview",
   "uid": "flatcar-swarm-overview",
   "version": 1,
-  "weekStart": ""
+  "weekStart": "",
+  "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+  }
 }
