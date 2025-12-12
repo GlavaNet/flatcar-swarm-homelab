@@ -29,6 +29,8 @@ drone-stack.yml
 # Environment files with secrets
 .env
 *.env
+.env.local
+.env.production
 
 # Docker secrets
 docker-compose.override.yml
@@ -49,3 +51,8 @@ test-*.sh
 # Local test scripts
 scripts/flash-single-card.sh
 deploy.log
+
+# Processed stack files (with substituted env vars)
+*-processed.yml
+
+*.old

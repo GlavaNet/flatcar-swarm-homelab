@@ -11,33 +11,86 @@ if [ ! -d "$REPO_DIR" ]; then
     git clone "$REPO_URL" "$REPO_DIR"
 fi
 
-echo "Generating TLS certificates..."
-mkdir -p /home/core/certs
-if [ ! -f /home/core/certs/vault.crt ]; then
-    openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-        -keyout /home/core/certs/vault.key \
-        -out /home/core/certs/vault.crt \
-        -subj "/CN=vault.local" 2>/dev/null
+echo "Generating TLS certificates for local services..."
+cd "$REPO_DIR"
+
+# Run certificate generation script
+if [ -f scripts/generate-local-certs.sh ]; then
+    bash scripts/generate-local-certs.sh
+else
+    # Fallback to simple cert generation for vault
+    mkdir -p /home/core/certs
+    if [ ! -f /home/core/certs/vault.crt ]; then
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout /home/core/certs/vault.key \
+            -out /home/core/certs/vault.crt \
+            -subj "/CN=vault.local" \
+            -addext "subjectAltName=DNS:vault.local" \
+            2>/dev/null
+    fi
 fi
 
-cat > /home/core/certs/dynamic.yml << 'EOF'
-tls:
-  certificates:
-    - certFile: /certs/vault.crt
-      keyFile: /certs/vault.key
+# Create .env.local if it doesn't exist
+if [ ! -f "$REPO_DIR/.env.local" ]; then
+    echo ""
+    echo "=== Environment Configuration Setup ==="
+    echo ""
+    
+    if [ -f "$REPO_DIR/.env.template" ]; then
+        cp "$REPO_DIR/.env.template" "$REPO_DIR/.env.local"
+        
+        echo "Created .env.local from template"
+        echo ""
+        echo "You need to configure your Tailscale settings:"
+        echo "  nano $REPO_DIR/.env.local"
+        echo ""
+        echo "Required settings:"
+        echo "  - TAILNET_NAME: Your Tailscale network name (e.g., tail1234a.ts.net)"
+        echo "  - TAILSCALE_HOSTNAME: This node's hostname (e.g., swarm-manager-1)"
+        echo ""
+        echo "To find your Tailnet name after deploying Tailscale:"
+        echo "  docker exec \$(docker ps -q -f name=tailscale) tailscale status | head -1"
+        echo ""
+    else
+        echo "ERROR: .env.template not found in repository"
+        echo "Creating minimal .env.local..."
+        
+        cat > "$REPO_DIR/.env.local" << 'EOF'
+# Tailscale Configuration
+TAILNET_NAME=YOUR_TAILNET_HERE.ts.net
+TAILSCALE_HOSTNAME=swarm-manager-1
+
+# Network Configuration
+CLUSTER_NETWORK=192.168.99.0/24
+PRIMARY_MANAGER_IP=192.168.99.101
+
+# Domain Configuration
+LOCAL_DOMAIN=local
 EOF
+        
+        echo "Created minimal .env.local - please edit it with your settings"
+    fi
+fi
 
 echo "Deploying stacks..."
 cd "$REPO_DIR"
 
 # Only deploy if this is first run (check for marker file)
 if [ ! -f /home/core/.cluster-initialized ]; then
-    bash scripts/deploy-services.sh
+    # Check if we should use env-aware deployment
+    if [ -f scripts/deploy-services-env.sh ]; then
+        echo "Using environment-aware deployment..."
+        bash scripts/deploy-services-env.sh
+    else
+        echo "Using standard deployment..."
+        bash scripts/deploy-services.sh
+    fi
+    
     touch /home/core/.cluster-initialized
     echo "Initial deployment complete"
 else
     echo "Cluster already initialized, skipping stack deployment"
-    echo "To redeploy: ssh to manager-1 and run: cd ~/flatcar-swarm-homelab && bash scripts/deploy-services.sh"
+    echo "To redeploy: cd ~/flatcar-swarm-homelab && bash scripts/deploy-services-env.sh"
 fi
 
 echo "Waiting for Forgejo to start..."
@@ -150,10 +203,16 @@ sudo systemctl enable --now git-poll.timer
 echo ""
 echo "=== Cluster initialization complete ==="
 echo ""
+echo "IMPORTANT: Configure your .env.local file"
+echo "  nano $REPO_DIR/.env.local"
+echo ""
+echo "Then redeploy services:"
+echo "  cd $REPO_DIR && bash scripts/deploy-services-env.sh"
+echo ""
 echo "MANUAL STEPS REQUIRED:"
 echo ""
 echo "1. Add to your local /etc/hosts:"
-echo "   192.168.99.101  git.local grafana.local prometheus.local alertmanager.local adguard.local vault.local traefik.local"
+echo "   192.168.99.101  git.local grafana.local prometheus.local alertmanager.local adguard.local vault.local traefik.local ha.local"
 echo ""
 if [ "$ntfy_choice" = "1" ]; then
     echo "2. Set up ntfy on your phone:"
@@ -184,15 +243,27 @@ echo "   - Push to GitHub → auto-deploys to cluster"
 echo "   - All deployment events sent to ntfy"
 echo ""
 echo "6. Access services:"
+echo "   Local (HTTPS with self-signed cert - needs trust):"
+echo "   - Vaultwarden: https://vault.local"
+echo "   - Home Assistant: https://ha.local (also :8123)"
+echo ""
+echo "   Local (HTTP):"
 echo "   - Traefik: http://traefik.local"
 echo "   - Forgejo: http://git.local"
 echo "   - Grafana: http://grafana.local (admin/admin)"
 echo "   - Prometheus: http://prometheus.local"
 echo "   - Alertmanager: http://alertmanager.local"
 echo "   - AdGuard: http://adguard.local"
-echo "   - Vaultwarden: http://vault.local"
 echo ""
-echo "7. Test notifications:"
+echo "   Remote (via Tailscale with trusted certs):"
+echo "   - Configure .env.local first, then:"
+echo "   - https://vault.<hostname>.<tailnet>.ts.net"
+echo "   - https://ha.<hostname>.<tailnet>.ts.net"
+echo ""
+echo "7. Trust local certificates (for HTTPS access):"
+echo "   See: scripts/generate-local-certs.sh output for instructions"
+echo ""
+echo "8. Test notifications:"
 if [ "$ntfy_choice" = "1" ]; then
     echo "   curl -d 'Hello from your Swarm cluster!' https://ntfy.sh/$ntfy_topic"
 else

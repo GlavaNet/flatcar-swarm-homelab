@@ -14,13 +14,22 @@ services:
       - "--log.level=INFO"
       - "--accesslog=true"
       - "--metrics.prometheus=true"
+      # Dynamic config for certificates
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
     ports:
       - "80:80"
       - "443:443"
       - "8081:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      - /home/core/certs:/certs:ro
+      # Mount self-signed certificates for local HTTPS access
+      - /home/core/certs:/home/core/certs:ro
+      # Mount Tailscale certificate directory for remote HTTPS access
+      - /var/lib/tailscale/certs:/etc/traefik/certs:ro
+    configs:
+      - source: traefik_dynamic_config
+        target: /etc/traefik/dynamic/certs.yml
     networks:
       - traefik-public
     deploy:
@@ -29,9 +38,13 @@ services:
           - node.role == manager
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.dashboard.rule=Host(`traefik.local`)"
+        - "traefik.http.routers.dashboard.rule=Host(`traefik.${LOCAL_DOMAIN:-local}`)"
         - "traefik.http.routers.dashboard.service=api@internal"
         - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
+
+configs:
+  traefik_dynamic_config:
+    file: ./traefik-dynamic.yml
 
 networks:
   traefik-public:

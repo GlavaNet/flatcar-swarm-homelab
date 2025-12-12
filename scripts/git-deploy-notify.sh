@@ -53,7 +53,7 @@ send_notification \
     "git"
 
 # Deploy services
-if bash scripts/deploy-services.sh > "$LOG_FILE" 2>&1; then
+if bash scripts/deploy-services-env.sh > "$LOG_FILE" 2>&1; then
     send_notification \
         "GitOps: Deployment Successful" \
         "All services deployed successfully. Commit: ${CURRENT_HASH}" \

@@ -1,0 +1,16 @@
+tls:
+  certificates:
+    # Self-signed certificates for local .local domain access
+    - certFile: /home/core/certs/vault.crt
+      keyFile: /home/core/certs/vault.key
+    
+    # Tailscale certificates for remote access
+    - certFile: /etc/traefik/certs/${TAILSCALE_HOSTNAME}.${TAILNET_NAME}.crt
+      keyFile: /etc/traefik/certs/${TAILSCALE_HOSTNAME}.${TAILNET_NAME}.key
+  
+  stores:
+    default:
+      defaultCertificate:
+        # Default to Tailscale cert for HTTPS
+        certFile: /etc/traefik/certs/${TAILSCALE_HOSTNAME}.${TAILNET_NAME}.crt
+        keyFile: /etc/traefik/certs/${TAILSCALE_HOSTNAME}.${TAILNET_NAME}.key

@@ -6,7 +6,9 @@ services:
     volumes:
       - vaultwarden-data:/data
     environment:
-      - DOMAIN=http://vault.local
+      # Set domain to Tailscale for mobile app compatibility
+      # Local HTTPS will work via certificate matching
+      - DOMAIN=https://vault.${TAILSCALE_HOSTNAME}.${TAILNET_NAME}
       - SIGNUPS_ALLOWED=true
       - WEBSOCKET_ENABLED=true
     networks:
@@ -16,8 +18,27 @@ services:
         constraints: [node.role == manager]
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.vaultwarden.rule=Host(`vault.local`)"
-        - "traefik.http.routers.vaultwarden.tls=true"
+        
+        # Local access via HTTPS (using self-signed cert)
+        - "traefik.http.routers.vaultwarden-local.rule=Host(`vault.${LOCAL_DOMAIN:-local}`)"
+        - "traefik.http.routers.vaultwarden-local.entrypoints=websecure"
+        - "traefik.http.routers.vaultwarden-local.tls=true"
+        - "traefik.http.routers.vaultwarden-local.service=vaultwarden"
+        
+        # Redirect HTTP to HTTPS for local access
+        - "traefik.http.middlewares.vaultwarden-redirect.redirectscheme.scheme=https"
+        - "traefik.http.middlewares.vaultwarden-redirect.redirectscheme.permanent=true"
+        - "traefik.http.routers.vaultwarden-local-http.rule=Host(`vault.${LOCAL_DOMAIN:-local}`)"
+        - "traefik.http.routers.vaultwarden-local-http.entrypoints=web"
+        - "traefik.http.routers.vaultwarden-local-http.middlewares=vaultwarden-redirect"
+        
+        # Tailscale HTTPS access (uses Tailscale cert)
+        - "traefik.http.routers.vaultwarden-ts.rule=Host(`vault.${TAILSCALE_HOSTNAME}.${TAILNET_NAME}`)"
+        - "traefik.http.routers.vaultwarden-ts.entrypoints=websecure"
+        - "traefik.http.routers.vaultwarden-ts.tls=true"
+        - "traefik.http.routers.vaultwarden-ts.service=vaultwarden"
+        
+        # Service definition (single backend for both routes)
         - "traefik.http.services.vaultwarden.loadbalancer.server.port=80"
 
 volumes:
