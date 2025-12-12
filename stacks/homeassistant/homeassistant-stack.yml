@@ -7,20 +7,11 @@ services:
       - TZ=America/Los_Angeles
     volumes:
       - homeassistant-config:/config
-    command: >
-      /bin/bash -c "
-      if [ ! -f /config/configuration.yaml ]; then
-        echo 'http:' > /config/configuration.yaml;
-        echo '  use_x_forwarded_for: true' >> /config/configuration.yaml;
-        echo '  trusted_proxies:' >> /config/configuration.yaml;
-        echo '    - 10.0.0.0/8' >> /config/configuration.yaml;
-        echo '    - 172.16.0.0/12' >> /config/configuration.yaml;
-        echo '    - 192.168.0.0/16' >> /config/configuration.yaml;
-        echo '' >> /config/configuration.yaml;
-        echo 'default_config:' >> /config/configuration.yaml;
-      fi;
-      exec /init
-      "
+    configs:
+      - source: ha_init_script
+        target: /usr/local/bin/ha-init.sh
+        mode: 0755
+    entrypoint: ["/usr/local/bin/ha-init.sh"]
     networks:
       - traefik-public
     ports:
@@ -31,6 +22,7 @@ services:
         mode: host
     devices:
       - /dev/ttyUSB0:/dev/ttyUSB0
+      - /dev/ttyUSB1:/dev/ttyUSB1
     deploy:
       placement:
         constraints:
@@ -42,6 +34,10 @@ services:
 
 volumes:
   homeassistant-config:
+
+configs:
+  ha_init_script:
+    file: ./ha-init.sh
 
 networks:
   traefik-public:
