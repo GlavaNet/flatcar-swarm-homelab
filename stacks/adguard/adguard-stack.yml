@@ -101,7 +101,7 @@ volumes:
   adguard-conf:
 
 configs:
-  adguard_config_v34:
+  adguard_config_v4:
     file: ./config/AdGuardHome.yaml.template
 
 networks:
