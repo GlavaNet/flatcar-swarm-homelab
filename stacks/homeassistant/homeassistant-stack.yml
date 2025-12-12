@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  homeassistant:
+    image: homeassistant/home-assistant:stable
+    environment:
+      - TZ=America/Los_Angeles
+    volumes:
+      - homeassistant-config:/config
+    networks:
+      - traefik-public
+    ports:
+      # Expose port 8123 directly for initial setup and integrations
+      - target: 8123
+        published: 8123
+        protocol: tcp
+        mode: host
+    devices:
+      - /dev/ttyUSB0:/dev/ttyUSB0
+    deploy:
+      placement:
+        constraints:
+          - node.hostname == swarm-manager-1
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.homeassistant.rule=Host(`ha.local`)"
+        - "traefik.http.services.homeassistant.loadbalancer.server.port=8123"
+
+volumes:
+  homeassistant-config:
+
+networks:
+  traefik-public:
+    external: true
