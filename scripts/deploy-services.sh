@@ -114,6 +114,10 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Vaultwarden (password manager)...
 docker stack deploy -c stacks/vaultwarden/vaultwarden-stack.yml vaultwarden
 send_notification "Vaultwarden Deployed" "Password manager is running" "default" "key"
 
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Home Assistant..."
+docker stack deploy -c stacks/homeassistant/homeassistant-stack.yml homeassistant
+send_notification "Home Assistant Deployed" "Home automation is running" "default" "house"
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deployment complete"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
@@ -131,6 +135,7 @@ if [ "$SKIP_ADGUARD" != "true" ]; then
     echo "  ✓ AdGuard       - http://adguard.local"
 fi
 echo "  ✓ Vaultwarden   - http://vault.local"
+echo "  ✓ Home Assistant - http://ha.local (also :8123)"
 echo ""
 echo "Check service status:"
 echo "  docker service ls"
