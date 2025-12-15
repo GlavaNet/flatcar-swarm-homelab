@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  glusterfs:
+    image: gluster/gluster-centos:latest
+    hostname: "{{.Node.Hostname}}"
+    environment:
+      - GLUSTER_VOLUME_NAME=gv0
+      - GLUSTER_BRICK_PATH=/data/brick1
+    volumes:
+      - gluster-data:/data
+      - gluster-config:/var/lib/glusterd
+    networks:
+      - gluster-net
+    ports:
+      - target: 24007
+        published: 24007
+        protocol: tcp
+        mode: host
+      - target: 24008
+        published: 24008
+        protocol: tcp
+        mode: host
+      - target: 49152
+        published: 49152
+        protocol: tcp
+        mode: host
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.role == manager
+      resources:
+        limits:
+          # Conservative limits for testing - adjust based on results
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 3
+
+  # GlusterFS client for mounting volumes
+  gluster-client:
+    image: alpine:latest
+    command: 
+      - sh
+      - -c
+      - |
+        apk add --no-cache glusterfs-client fuse
+        mkdir -p /mnt/gluster
+        # Keep container running
+        tail -f /dev/null
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    volumes:
+      - type: bind
+        source: /mnt/gluster
+        target: /mnt/gluster
+        bind:
+          propagation: shared
+    networks:
+      - gluster-net
+    deploy:
+      mode: global
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+volumes:
+  gluster-data:
+    driver: local
+  gluster-config:
+    driver: local
+
+networks:
+  gluster-net:
+    driver: overlay
+    attachable: true
