@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Los_Angeles
+      - BASE_URL=http://recipes.local
+      - ALLOW_SIGNUP=true
+      - MAX_WORKERS=1
+      - WEB_CONCURRENCY=1
+    volumes:
+      - mealie-data:/app/data
+    networks:
+      - traefik-public
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      resources:
+        limits:
+          memory: 256M
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.mealie.rule=Host(`recipes.local`)"
+        - "traefik.http.routers.mealie.entrypoints=web"
+        - "traefik.http.services.mealie.loadbalancer.server.port=9000"
+
+volumes:
+  mealie-data:
+
+networks:
+  traefik-public:
+    external: true
