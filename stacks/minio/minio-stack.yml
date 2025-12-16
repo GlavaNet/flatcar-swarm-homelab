@@ -1,69 +1,36 @@
 version: '3.8'
-
-# MinIO Distributed Storage - ARM64 Native
-# Provides S3-compatible object storage across 3 manager nodes
-
 services:
   minio:
     image: minio/minio:latest
-    hostname: "minio-{{.Task.Slot}}"
-    command: 
-      - server
-      - http://swarm-manager-{1...3}:9000/data
-      - --console-address
-      - ":9001"
+    command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
     volumes:
       - minio-data:/data
     networks:
-      - storage-net
       - traefik-public
     ports:
       - target: 9000
         published: 9000
-        protocol: tcp
         mode: host
       - target: 9001
         published: 9001
-        protocol: tcp
         mode: host
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
     deploy:
-      mode: global
+      replicas: 1
       placement:
-        constraints:
-          - node.role == manager
+        constraints: [node.hostname == swarm-manager-1]
       resources:
         limits:
           cpus: '1.0'
           memory: 512M
-        reservations:
-          cpus: '0.5'
-          memory: 256M
       labels:
-        # Console access via Traefik
         - "traefik.enable=true"
-        - "traefik.http.routers.minio-console.rule=Host(`minio.local`)"
-        - "traefik.http.routers.minio-console.entrypoints=web"
-        - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-        # API access
-        - "traefik.http.routers.minio-api.rule=Host(`s3.local`)"
-        - "traefik.http.routers.minio-api.entrypoints=web"
-        - "traefik.http.services.minio-api.loadbalancer.server.port=9000"
-
+        - "traefik.http.routers.minio.rule=Host(`minio.local`)"
+        - "traefik.http.services.minio.loadbalancer.server.port=9001"
 volumes:
   minio-data:
-    driver: local
-
 networks:
-  storage-net:
-    driver: overlay
-    attachable: true
   traefik-public:
     external: true

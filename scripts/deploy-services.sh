@@ -31,6 +31,30 @@ send_notification() {
     fi
 }
 
+# Setup MinIO if not already deployed
+if ! docker service ls | grep -q minio_minio; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up MinIO..."
+    
+    if [ ! -f ~/.minio-password ]; then
+        MINIO_PASSWORD=$(openssl rand -base64 24)
+        echo "$MINIO_PASSWORD" > ~/.minio-password
+        chmod 600 ~/.minio-password
+    else
+        MINIO_PASSWORD=$(cat ~/.minio-password)
+    fi
+    
+    sed "s/\${MINIO_PASSWORD}/$MINIO_PASSWORD/g" \
+        stacks/minio/minio-stack.yml > /tmp/minio-deploy.yml
+    docker stack deploy -c /tmp/minio-deploy.yml minio
+    rm /tmp/minio-deploy.yml
+    
+    sleep 30
+    docker run --rm --network host --entrypoint /bin/sh minio/mc:latest \
+        -c "mc alias set homelab http://localhost:9000 minioadmin ${MINIO_PASSWORD} && mc mb homelab/backups" || true
+    
+    send_notification "MinIO Deployed" "Object storage ready" "default" "database"
+fi
+
 # Check if Tailscale secret exists
 if ! docker secret inspect tailscale_auth_key >/dev/null 2>&1; then
     echo ""
@@ -123,19 +147,24 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deployment complete"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 echo ""
 echo "Services deployed:"
-echo "  ✓ Traefik       - http://traefik.local"
+echo "  ✓ MinIO        - http://minio.local"
+echo "  ✓ Traefik      - http://traefik.local"
 if [ "$SKIP_TAILSCALE" != "true" ]; then
-    echo "  ✓ Tailscale     - Check admin console"
+    echo "  ✓ Tailscale    - Check admin console"
 fi
-echo "  ✓ Forgejo       - http://git.local"
-echo "  ✓ Prometheus    - http://prometheus.local"
-echo "  ✓ Alertmanager  - http://alertmanager.local"
-echo "  ✓ Grafana       - http://grafana.local"
+echo "  ✓ Forgejo      - http://git.local"
+echo "  ✓ Prometheus   - http://prometheus.local"
+echo "  ✓ Alertmanager - http://alertmanager.local"
+echo "  ✓ Grafana      - http://grafana.local"
 if [ "$SKIP_ADGUARD" != "true" ]; then
-    echo "  ✓ AdGuard       - http://adguard.local"
+    echo "  ✓ AdGuard      - http://adguard.local"
 fi
-echo "  ✓ Vaultwarden   - http://vault.local"
+echo "  ✓ Vaultwarden  - http://vault.local (also :8123)"
 echo "  ✓ Home Assistant - http://ha.local (also :8123)"
+echo ""
+echo "Backup system:"
+echo "  - MinIO: Daily at 2:00 AM"
+echo "  - Volume replication: Daily at 3:00 AM"
 echo ""
 echo "Check service status:"
 echo "  docker service ls"
@@ -146,22 +175,3 @@ echo ""
 
 # Send final success notification
 send_notification "Deployment Complete" "All services deployed successfully! ✅" "default" "white_check_mark,rocket"
-
-# Display notification setup reminder
-if [ "$NTFY_ENABLED" = "true" ] && [[ "$NTFY_TOPIC_URL" == *"ntfy.sh"* ]]; then
-    TOPIC_NAME=$(echo "$NTFY_TOPIC_URL" | sed 's|https://ntfy.sh/||' | sed 's|?.*||')
-    echo "================================="
-    echo "ntfy Notifications Setup"
-    echo "================================="
-    echo ""
-    echo "To receive mobile notifications:"
-    echo "  1. Install ntfy app (iOS/Android)"
-    echo "  2. Add subscription:"
-    echo "     - Server: https://ntfy.sh"
-    echo "     - Topic: $TOPIC_NAME"
-    echo "  3. Enable notifications in phone settings"
-    echo ""
-    echo "Test notification:"
-    echo "  curl -d 'Test from Swarm cluster' $NTFY_TOPIC_URL"
-    echo ""
-fi
