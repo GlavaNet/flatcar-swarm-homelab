@@ -1,0 +1,18 @@
+[Unit]
+Description=JIT Service Webhook Receiver
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=core
+Group=core
+Environment="WEBHOOK_SECRET=your-secret-here-change-me"
+ExecStart=/usr/bin/python3 /opt/bin/webhook-receiver.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

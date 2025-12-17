@@ -1,0 +1,11 @@
+[Unit]
+Description=Check JIT services every 5 minutes
+Requires=jit-checker.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=5min
+Unit=jit-checker.service
+
+[Install]
+WantedBy=timers.target

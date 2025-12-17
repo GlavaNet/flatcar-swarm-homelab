@@ -1,0 +1,12 @@
+[Unit]
+Description=Just-in-Time Service Auto-Shutdown Checker
+After=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/bin/jit-services.sh check
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

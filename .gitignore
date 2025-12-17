@@ -56,3 +56,17 @@ deploy.log
 *-processed.yml
 
 *.old
+
+# JIT service state directory (created at runtime)
+/jit-services/
+jit-services/
+
+# Webhook secret (generated during installation)
+.webhook-secret
+*/.webhook-secret
+
+# Auto-shutdown timer files
+*.shutdown
+
+# JIT service logs (if stored in repo)
+jit-services.log

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starting Mealie...</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            max-width: 500px;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        .spinner {
+            margin: 2rem auto;
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .status {
+            margin: 1rem 0;
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        .details {
+            margin-top: 2rem;
+            font-size: 0.9rem;
+            opacity: 0.7;
+            line-height: 1.6;
+        }
+        button {
+            margin-top: 2rem;
+            padding: 1rem 2rem;
+            font-size: 1rem;
+            background: white;
+            color: #667eea;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍳 Mealie</h1>
+        <div class="spinner"></div>
+        <div class="status" id="status">Starting service...</div>
+        <div class="details">
+            Mealie is starting up. This usually takes 30-60 seconds.<br>
+            The page will automatically reload when ready.
+        </div>
+        <button id="startBtn" onclick="startService()">Start Service Manually</button>
+    </div>
+
+    <script>
+        let checkInterval;
+        let attempts = 0;
+        const maxAttempts = 60; // 2 minutes
+
+        async function startService() {
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('status').textContent = 'Requesting service start...';
+            
+            try {
+                await fetch('http://192.168.99.101:9999/start/mealie', {
+                    method: 'POST'
+                });
+                document.getElementById('status').textContent = 'Service starting...';
+                checkService();
+            } catch (error) {
+                document.getElementById('status').textContent = 'Error starting service';
+                document.getElementById('startBtn').disabled = false;
+            }
+        }
+
+        async function checkService() {
+            if (attempts >= maxAttempts) {
+                document.getElementById('status').textContent = 'Service failed to start. Please try again.';
+                document.getElementById('startBtn').disabled = false;
+                clearInterval(checkInterval);
+                return;
+            }
+
+            try {
+                // Try to reach Mealie directly
+                const response = await fetch('/api/app/about', { 
+                    method: 'GET',
+                    signal: AbortSignal.timeout(2000)
+                });
+                
+                if (response.ok || response.status === 404) {
+                    // Service is up (404 is fine, means Mealie is responding)
+                    document.getElementById('status').textContent = 'Service ready! Redirecting...';
+                    clearInterval(checkInterval);
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                }
+            } catch (error) {
+                attempts++;
+                document.getElementById('status').textContent = 
+                    `Waiting for service... (${attempts}/${maxAttempts})`;
+            }
+        }
+
+        // Auto-start service when page loads
+        window.addEventListener('load', () => {
+            startService();
+            checkInterval = setInterval(checkService, 2000);
+        });
+    </script>
+</body>
+</html>
