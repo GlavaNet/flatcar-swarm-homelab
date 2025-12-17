@@ -1,0 +1,115 @@
+<!-- stacks/jit-error-pages/503.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starting Service...</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: white;
+        }
+        .container {
+            text-align: center;
+            padding: 2rem;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            max-width: 500px;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        .spinner {
+            margin: 2rem auto;
+            width: 60px;
+            height: 60px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .status { margin: 1rem 0; font-size: 1.2rem; }
+        #countdown { font-size: 2rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Starting Service</h1>
+        <div class="spinner"></div>
+        <div class="status" id="status">Activating service...</div>
+        <div id="countdown">45</div>
+        <div style="font-size: 0.9rem; opacity: 0.7;">
+            The page will reload automatically when ready
+        </div>
+    </div>
+
+    <script>
+        // Get the hostname to determine which service
+        const host = window.location.hostname;
+        const serviceMap = {
+            'recipes.local': { name: 'mealie', time: 45 },
+            'minio.local': { name: 'minio', time: 30 },
+            'git.local': { name: 'forgejo', time: 30 }
+        };
+        
+        const service = serviceMap[host];
+        let countdown = service ? service.time : 45;
+        
+        // Update status
+        document.getElementById('status').textContent = 
+            `Starting ${service ? service.name : 'service'}...`;
+        
+        // Trigger service startup
+        if (service) {
+            fetch(`http://192.168.99.101:9999/start/${service.name}`, {
+                method: 'POST'
+            }).catch(err => console.log('Startup request sent'));
+        }
+        
+        // Countdown timer
+        const countdownEl = document.getElementById('countdown');
+        const timer = setInterval(() => {
+            countdown--;
+            countdownEl.textContent = countdown;
+            
+            if (countdown <= 0) {
+                clearInterval(timer);
+                document.getElementById('status').textContent = 'Checking service...';
+            }
+        }, 1000);
+        
+        // Check if service is available every 3 seconds
+        const checker = setInterval(async () => {
+            try {
+                const response = await fetch(window.location.href, {
+                    method: 'HEAD',
+                    cache: 'no-cache'
+                });
+                
+                if (response.ok || response.status !== 503) {
+                    clearInterval(checker);
+                    clearInterval(timer);
+                    document.getElementById('status').textContent = 'Service ready! Reloading...';
+                    setTimeout(() => window.location.reload(), 1000);
+                }
+            } catch (err) {
+                // Service not ready yet
+            }
+        }, 3000);
+        
+        // Force reload after maximum wait time
+        setTimeout(() => {
+            window.location.reload();
+        }, 60000);
+    </script>
+</body>
+</html>

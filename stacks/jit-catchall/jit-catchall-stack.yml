@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  jit-catchall:
+    image: nginx:alpine
+    configs:
+      - source: nginx_config
+        target: /etc/nginx/nginx.conf
+      - source: splash_page
+        target: /usr/share/nginx/html/index.html
+    networks:
+      - traefik-public
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=traefik-public"
+        
+        # Catch-all for Mealie
+        - "traefik.http.routers.jit-mealie-catchall.rule=Host(`recipes.local`)"
+        - "traefik.http.routers.jit-mealie-catchall.entrypoints=web"
+        - "traefik.http.routers.jit-mealie-catchall.priority=1"
+        - "traefik.http.routers.jit-mealie-catchall.service=jit-catchall"
+        
+        # Catch-all for MinIO
+        - "traefik.http.routers.jit-minio-catchall.rule=Host(`minio.local`)"
+        - "traefik.http.routers.jit-minio-catchall.entrypoints=web"
+        - "traefik.http.routers.jit-minio-catchall.priority=1"
+        - "traefik.http.routers.jit-minio-catchall.service=jit-catchall"
+        
+        # Catch-all for Forgejo
+        - "traefik.http.routers.jit-forgejo-catchall.rule=Host(`git.local`)"
+        - "traefik.http.routers.jit-forgejo-catchall.entrypoints=web"
+        - "traefik.http.routers.jit-forgejo-catchall.priority=1"
+        - "traefik.http.routers.jit-forgejo-catchall.service=jit-catchall"
+        
+        # Catch-all for Vaultwarden
+        - "traefik.http.routers.jit-vaultwarden-catchall.rule=Host(`vault.local`)"
+        - "traefik.http.routers.jit-vaultwarden-catchall.entrypoints=web"
+        - "traefik.http.routers.jit-vaultwarden-catchall.priority=1"
+        - "traefik.http.routers.jit-vaultwarden-catchall.service=jit-catchall"
+        
+        # Service definition (shared by all routers)
+        - "traefik.http.services.jit-catchall.loadbalancer.server.port=80"
+
+configs:
+  nginx_config:
+    file: ./nginx.conf
+  splash_page:
+    file: ./index.html
+
+networks:
+  traefik-public:
+    external: true

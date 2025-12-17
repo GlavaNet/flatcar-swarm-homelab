@@ -1,0 +1,37 @@
+# stacks/jit-error-pages/error-pages-stack.yml
+version: '3.8'
+
+services:
+  error-pages:
+    image: nginx:alpine
+    configs:
+      - source: nginx_config
+        target: /etc/nginx/nginx.conf
+      - source: error_503
+        target: /usr/share/nginx/html/503.html
+    networks:
+      - traefik-public
+    deploy:
+      replicas: 1
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.errors.rule=HostRegexp(`{host:.+}`)"
+        - "traefik.http.routers.errors.priority=1"
+        - "traefik.http.routers.errors.entrypoints=web"
+        - "traefik.http.routers.errors.middlewares=error-pages-middleware"
+        - "traefik.http.services.error-pages.loadbalancer.server.port=80"
+        - "traefik.http.middlewares.error-pages-middleware.errors.status=503"
+        - "traefik.http.middlewares.error-pages-middleware.errors.service=error-pages"
+        - "traefik.http.middlewares.error-pages-middleware.errors.query=/{status}.html"
+
+configs:
+  nginx_config:
+    file: ./nginx.conf
+  error_503:
+    file: ./503.html
+
+networks:
+  traefik-public:
+    external: true

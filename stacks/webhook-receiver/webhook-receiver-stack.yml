@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  webhook-receiver:
+    image: python:3.11-alpine
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache docker-cli
+        python3 /app/webhook-receiver.py
+    configs:
+      - source: webhook_script
+        target: /app/webhook-receiver.py
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - traefik-public
+    ports:
+      - target: 9999
+        published: 9999
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+configs:
+  webhook_script:
+    file: ./webhook-receiver.py
+
+networks:
+  traefik-public:
+    external: true

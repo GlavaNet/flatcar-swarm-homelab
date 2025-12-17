@@ -21,6 +21,7 @@ services:
         
         # Local access via HTTPS (using self-signed cert)
         - "traefik.http.routers.vaultwarden-local.rule=Host(`vault.${LOCAL_DOMAIN:-local}`)"
+        - "traefik.http.routers.vaultwarden-local.priority=100"
         - "traefik.http.routers.vaultwarden-local.entrypoints=websecure"
         - "traefik.http.routers.vaultwarden-local.tls=true"
         - "traefik.http.routers.vaultwarden-local.service=vaultwarden"

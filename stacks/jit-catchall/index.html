@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starting Service...</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; color: white;
+        }
+        .container {
+            text-align: center; padding: 2rem;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px; max-width: 500px;
+        }
+        h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        .spinner {
+            margin: 2rem auto; width: 60px; height: 60px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top-color: white; border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .status { margin: 1rem 0; font-size: 1.2rem; }
+        #countdown { font-size: 2rem; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Starting Service</h1>
+        <div class="spinner"></div>
+        <div class="status" id="status">Activating service...</div>
+        <div id="countdown">45</div>
+        <div style="font-size: 0.9rem; opacity: 0.7; margin-top: 1rem;">
+            The page will reload automatically when ready
+        </div>
+    </div>
+    <script>
+        var host = window.location.hostname;
+        var serviceMap = {
+            'recipes.local': { name: 'mealie', time: 45 },
+            'minio.local': { name: 'minio', time: 30 },
+            'git.local': { name: 'forgejo', time: 30 }
+            'vault.local': { name: 'vaultwarden', time: 45 },
+            'vault.local': { name: 'vaultwarden', time: 45 },
+        };
+        
+        var service = serviceMap[host];
+        var countdown = service ? service.time : 45;
+        
+        document.getElementById('status').textContent = 
+            service ? 'Starting ' + service.name + '...' : 'Starting service...';
+        
+        // Try all manager nodes with ingress mode (all IPs work now!)
+        function tryStartService() {
+            if (!service) return;
+            
+            var webhookUrls = [
+                'http://192.168.99.101:9999/start/' + service.name,
+                'http://192.168.99.102:9999/start/' + service.name,
+                'http://192.168.99.103:9999/start/' + service.name
+            ];
+            
+            console.log('Starting service via webhook (trying all nodes)...');
+            
+            webhookUrls.forEach(function(url) {
+                fetch(url, {
+                    method: 'POST',
+                    mode: 'no-cors'
+                }).catch(function() {
+                    console.log('Tried: ' + url);
+                });
+            });
+        }
+        
+        tryStartService();
+        
+        // Countdown
+        var countdownEl = document.getElementById('countdown');
+        var timer = setInterval(function() {
+            countdown--;
+            countdownEl.textContent = countdown;
+            if (countdown <= 0) clearInterval(timer);
+        }, 1000);
+        
+        // Check if service is ready
+        var checker = setInterval(function() {
+            fetch(window.location.href, {
+                method: 'HEAD',
+                cache: 'no-cache'
+            })
+            .then(function(response) {
+                var contentType = response.headers.get('content-type');
+                if (contentType && contentType.indexOf('text/html') === -1) {
+                    clearInterval(checker);
+                    clearInterval(timer);
+                    document.getElementById('status').textContent = 'Service ready! Reloading...';
+                    setTimeout(function() { window.location.reload(); }, 1000);
+                }
+            })
+            .catch(function() {});
+        }, 3000);
+        
+        setTimeout(function() { window.location.reload(); }, 60000);
+    </script>
+</body>
+</html>

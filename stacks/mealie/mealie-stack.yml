@@ -21,10 +21,11 @@ services:
         constraints: [node.role == manager]
       labels:
         - "traefik.enable=true"
+        - "traefik.docker.network=traefik-public"
         - "traefik.http.routers.mealie.rule=Host(`recipes.local`)"
         - "traefik.http.routers.mealie.entrypoints=web"
+        - "traefik.http.routers.mealie.priority=100"
         - "traefik.http.services.mealie.loadbalancer.server.port=9000"
-
 volumes:
   mealie-data:
 
