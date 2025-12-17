@@ -1,5 +1,5 @@
 #!/bin/bash
-# Deploy all Docker stacks with secret handling and ntfy notifications
+# Deploy services with environment variable substitution
 
 set -e
 cd "$(dirname "$0")/.."
@@ -7,13 +7,74 @@ cd "$(dirname "$0")/.."
 NTFY_ENABLED=false
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deployment"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Starting deployment with env substitution"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 
-# Load environment variables
+# Load system environment
 if [ -f /etc/environment ]; then
     source /etc/environment
 fi
+
+# Load local environment configuration
+if [ -f .env.local ]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Loading local environment from .env.local"
+    source .env.local
+else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] WARNING: .env.local not found"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Copy .env.template to .env.local and configure it"
+    
+    if [ ! -f .env.template ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: .env.template not found"
+        exit 1
+    fi
+    
+    echo ""
+    read -p "Create .env.local from template now? (y/n): " create_env
+    
+    if [ "$create_env" = "y" ]; then
+        cp .env.template .env.local
+        echo ""
+        echo "Please edit .env.local with your configuration:"
+        echo "  nano .env.local"
+        echo ""
+        echo "Then run this script again."
+        exit 0
+    else
+        exit 1
+    fi
+fi
+
+# Validate required variables
+REQUIRED_VARS=("TAILNET_NAME" "TAILSCALE_HOSTNAME" "PRIMARY_MANAGER_IP")
+for var in "${REQUIRED_VARS[@]}"; do
+    if [ -z "${!var}" ]; then
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: Required variable $var not set in .env.local"
+        exit 1
+    fi
+done
+
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] Configuration loaded:"
+echo "  TAILNET_NAME: $TAILNET_NAME"
+echo "  TAILSCALE_HOSTNAME: $TAILSCALE_HOSTNAME"
+echo "  PRIMARY_MANAGER_IP: $PRIMARY_MANAGER_IP"
+
+# Function to substitute variables in stack files
+substitute_and_deploy() {
+    local stack_name="$1"
+    local stack_file="$2"
+    local temp_file="/tmp/${stack_name}-stack.yml"
+    
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Processing $stack_name..."
+    
+    # Substitute environment variables
+    envsubst < "$stack_file" > "$temp_file"
+    
+    # Deploy
+    docker stack deploy -c "$temp_file" "$stack_name"
+    
+    # Clean up
+    rm -f "$temp_file"
+}
 
 # Function to send ntfy notification
 send_notification() {
@@ -30,30 +91,6 @@ send_notification() {
              "${NTFY_TOPIC_URL}" 2>/dev/null || true
     fi
 }
-
-# Setup MinIO if not already deployed
-if ! docker service ls | grep -q minio_minio; then
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Setting up MinIO..."
-    
-    if [ ! -f ~/.minio-password ]; then
-        MINIO_PASSWORD=$(openssl rand -base64 24)
-        echo "$MINIO_PASSWORD" > ~/.minio-password
-        chmod 600 ~/.minio-password
-    else
-        MINIO_PASSWORD=$(cat ~/.minio-password)
-    fi
-    
-    sed "s/\${MINIO_PASSWORD}/$MINIO_PASSWORD/g" \
-        stacks/minio/minio-stack.yml > /tmp/minio-deploy.yml
-    docker stack deploy -c /tmp/minio-deploy.yml minio
-    rm /tmp/minio-deploy.yml
-    
-    sleep 30
-    docker run --rm --network host --entrypoint /bin/sh minio/mc:latest \
-        -c "mc alias set homelab http://localhost:9000 minioadmin ${MINIO_PASSWORD} && mc mb homelab/backups" || true
-    
-    send_notification "MinIO Deployed" "Object storage ready" "default" "database"
-fi
 
 # Check if Tailscale secret exists
 if ! docker secret inspect tailscale_auth_key >/dev/null 2>&1; then
@@ -87,10 +124,18 @@ fi
 
 # Deploy core infrastructure first
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Traefik (reverse proxy)..."
-docker stack deploy -c stacks/traefik/traefik-stack.yml traefik
+
+# Process traefik-dynamic.yml separately
+if [ -f stacks/traefik/traefik-dynamic.yml ]; then
+    envsubst < stacks/traefik/traefik-dynamic.yml > /tmp/traefik-dynamic.yml
+    sudo cp /tmp/traefik-dynamic.yml /home/core/certs/dynamic.yml || cp /tmp/traefik-dynamic.yml stacks/traefik/traefik-dynamic-processed.yml
+    rm -f /tmp/traefik-dynamic.yml
+fi
+
+substitute_and_deploy "traefik" "stacks/traefik/traefik-stack.yml"
 sleep 5
 
-# Check if ntfy is accessible (self-hosted or public)
+# Check if ntfy is accessible
 if [ -n "$NTFY_TOPIC_URL" ]; then
     if curl -s --max-time 5 "${NTFY_TOPIC_URL}" > /dev/null 2>&1; then
         NTFY_ENABLED=true
@@ -104,13 +149,13 @@ fi
 # Deploy Tailscale (optional VPN access)
 if [ "$SKIP_TAILSCALE" != "true" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Tailscale (VPN)..."
-    docker stack deploy -c stacks/tailscale/tailscale-stack.yml tailscale
+    substitute_and_deploy "tailscale" "stacks/tailscale/tailscale-stack.yml"
     send_notification "Tailscale Deployed" "VPN access configured" "default" "lock"
 fi
 
 # Deploy application services
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Forgejo (Git server)..."
-docker stack deploy -c stacks/forgejo/forgejo-stack.yml forgejo
+substitute_and_deploy "forgejo" "stacks/forgejo/forgejo-stack.yml"
 send_notification "Forgejo Deployed" "Git server is running" "default" "git"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Monitoring (Prometheus + Grafana + Alertmanager)..."
@@ -123,23 +168,23 @@ if [ -n "$NTFY_TOPIC_URL" ]; then
     mv /tmp/alertmanager.yml.tmp stacks/monitoring/alertmanager.yml
 fi
 
-docker stack deploy -c stacks/monitoring/monitoring-stack.yml monitoring
+substitute_and_deploy "monitoring" "stacks/monitoring/monitoring-stack.yml"
 send_notification "Monitoring Deployed" "Prometheus, Grafana, and Alertmanager are running" "default" "chart_with_upwards_trend"
 sleep 5
 
 # Deploy network services
 if [ "$SKIP_ADGUARD" != "true" ]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying AdGuard (DNS/ad-blocker)..."
-    docker stack deploy -c stacks/adguard/adguard-stack.yml adguard
+    substitute_and_deploy "adguard" "stacks/adguard/adguard-stack.yml"
     send_notification "AdGuard Deployed" "DNS and ad-blocking active" "default" "shield"
 fi
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Vaultwarden (password manager)..."
-docker stack deploy -c stacks/vaultwarden/vaultwarden-stack.yml vaultwarden
+substitute_and_deploy "vaultwarden" "stacks/vaultwarden/vaultwarden-stack.yml"
 send_notification "Vaultwarden Deployed" "Password manager is running" "default" "key"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deploying Home Assistant..."
-docker stack deploy -c stacks/homeassistant/homeassistant-stack.yml homeassistant
+substitute_and_deploy "homeassistant" "stacks/homeassistant/homeassistant-stack.yml"
 send_notification "Home Assistant Deployed" "Home automation is running" "default" "house"
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
@@ -147,30 +192,24 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Deployment complete"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] ========================================"
 echo ""
 echo "Services deployed:"
-echo "  ✓ MinIO        - http://minio.local"
-echo "  ✓ Traefik      - http://traefik.local"
+echo "  ✓ Traefik       - http://traefik.local"
 if [ "$SKIP_TAILSCALE" != "true" ]; then
-    echo "  ✓ Tailscale    - Check admin console"
+    echo "  ✓ Tailscale     - Check admin console"
 fi
-echo "  ✓ Forgejo      - http://git.local"
-echo "  ✓ Prometheus   - http://prometheus.local"
-echo "  ✓ Alertmanager - http://alertmanager.local"
-echo "  ✓ Grafana      - http://grafana.local"
+echo "  ✓ Forgejo       - http://git.local"
+echo "  ✓ Prometheus    - http://prometheus.local"
+echo "  ✓ Alertmanager  - http://alertmanager.local"
+echo "  ✓ Grafana       - http://grafana.local"
 if [ "$SKIP_ADGUARD" != "true" ]; then
-    echo "  ✓ AdGuard      - http://adguard.local"
+    echo "  ✓ AdGuard       - http://adguard.local"
 fi
-echo "  ✓ Vaultwarden  - http://vault.local (also :8123)"
+echo "  ✓ Vaultwarden   - https://vault.local (local HTTPS)"
+echo "  ✓              - https://vault.${TAILSCALE_HOSTNAME}.${TAILNET_NAME} (remote)"
 echo "  ✓ Home Assistant - http://ha.local (also :8123)"
-echo ""
-echo "Backup system:"
-echo "  - MinIO: Daily at 2:00 AM"
-echo "  - Volume replication: Daily at 3:00 AM"
+echo "  ✓              - https://ha.${TAILSCALE_HOSTNAME}.${TAILNET_NAME} (remote)"
 echo ""
 echo "Check service status:"
 echo "  docker service ls"
-echo ""
-echo "View logs for a service:"
-echo "  docker service logs -f <service_name>"
 echo ""
 
 # Send final success notification

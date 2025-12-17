@@ -294,8 +294,8 @@ send_notification "GitOps: Repository Updated" "Commit: ${CURRENT_HASH} - ${COMM
 
 DEPLOY_SCRIPT=""
 
-if [ -f scripts/deploy-services-env.sh ]; then
-    DEPLOY_SCRIPT="scripts/deploy-services-env.sh"
+if [ -f scripts/deploy-services.sh ]; then
+    DEPLOY_SCRIPT="scripts/deploy-services.sh"
     log "Using environment-aware deployment script: $DEPLOY_SCRIPT"
     
     if [ ! -f .env.local ]; then
@@ -432,8 +432,8 @@ echo "=== Deploying stacks ==="
 
 # Only deploy if this is first run
 if [ ! -f /home/core/.cluster-initialized ]; then
-    if [ -f scripts/deploy-services-env.sh ]; then
-        bash scripts/deploy-services-env.sh
+    if [ -f scripts/deploy-services.sh ]; then
+        bash scripts/deploy-services.sh
     else
         bash scripts/deploy-services.sh
     fi
