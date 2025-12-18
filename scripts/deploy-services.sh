@@ -33,7 +33,7 @@ echo ""
 # If NTFY_TOPIC_URL not set in .env.local, use or create ~/.ntfy-url
 if [ -z "$NTFY_TOPIC_URL" ] && [ -f scripts/setup-ntfy-url.sh ]; then
     export NTFY_TOPIC_URL=$(bash scripts/setup-ntfy-url.sh)
-    echo "  NTFY_TOPIC_URL: $NTFY_TOPIC_URL (auto-configured)"
+    echo "   NTFY_TOPIC_URL: $NTFY_TOPIC_URL (auto-configured)"
 fi
 
 # Ensure certs directory exists
@@ -78,13 +78,14 @@ echo ""
 # Substitute ntfy URL in alertmanager.yml
 if [ -n "$NTFY_TOPIC_URL" ]; then
     echo "Configuring alertmanager with ntfy notifications..."
+    cd "$REPO_DIR/stacks/monitoring"
     sed "s|{{NTFY_TOPIC_URL}}|$NTFY_TOPIC_URL|g" \
-        stacks/monitoring/alertmanager.yml > /tmp/alertmanager.yml.tmp
-    mv /tmp/alertmanager.yml.tmp stacks/monitoring/alertmanager.yml
+        alertmanager.yml > /tmp/alertmanager.yml.tmp
+    mv /tmp/alertmanager.yml.tmp alertmanager.yml
 fi
 
 echo "=== Deploying Monitoring ==="
-cd "$REPO_DIR/stacks/monitoring"
+# cd "$REPO_DIR/stacks/monitoring"
 docker stack deploy -c monitoring-stack.yml monitoring
 echo "✓ Monitoring deployed"
 
