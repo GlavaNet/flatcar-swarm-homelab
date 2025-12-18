@@ -28,85 +28,187 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .status { margin: 1rem 0; font-size: 1.2rem; }
         #countdown { font-size: 2rem; margin: 1rem 0; }
+        .details { font-size: 0.9rem; opacity: 0.7; margin-top: 1rem; }
+        #debug { 
+            margin-top: 2rem; padding: 1rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            font-size: 0.8rem;
+            text-align: left;
+            max-height: 200px;
+            overflow-y: auto;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 Starting Service</h1>
+        <h1 id="title">🚀 Starting Service</h1>
         <div class="spinner"></div>
         <div class="status" id="status">Activating service...</div>
-        <div id="countdown">45</div>
-        <div style="font-size: 0.9rem; opacity: 0.7; margin-top: 1rem;">
+        <div id="countdown">60</div>
+        <div class="details">
             The page will reload automatically when ready
         </div>
+        <div id="debug"></div>
     </div>
     <script>
-        var host = window.location.hostname;
-        var serviceMap = {
-            'recipes.local': { name: 'mealie', time: 45 },
-            'minio.local': { name: 'minio', time: 30 },
-            'git.local': { name: 'forgejo', time: 30 }
-            'vault.local': { name: 'vaultwarden', time: 45 },
-            'vault.local': { name: 'vaultwarden', time: 45 },
+        // Get current hostname and determine service
+        const host = window.location.hostname;
+        const protocol = window.location.protocol;
+        
+        // Map hostnames to services
+        const serviceMap = {
+            'recipes.local': { name: 'mealie', displayName: 'Mealie', time: 60 },
+            'minio.local': { name: 'minio', displayName: 'MinIO', time: 45 },
+            'git.local': { name: 'forgejo', displayName: 'Forgejo', time: 60 },
+            'vault.local': { name: 'vaultwarden', displayName: 'Vaultwarden', time: 60 }
         };
         
-        var service = serviceMap[host];
-        var countdown = service ? service.time : 45;
+        const service = serviceMap[host];
+        let countdown = service ? service.time : 60;
+        let checkAttempts = 0;
+        const maxCheckAttempts = 40; // 40 attempts * 3 seconds = 2 minutes
         
-        document.getElementById('status').textContent = 
-            service ? 'Starting ' + service.name + '...' : 'Starting service...';
+        // Debug logging
+        function log(message) {
+            console.log(message);
+            const debugDiv = document.getElementById('debug');
+            const time = new Date().toLocaleTimeString();
+            debugDiv.innerHTML += `[${time}] ${message}<br>`;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
         
-        // Try all manager nodes with ingress mode (all IPs work now!)
-        function tryStartService() {
-            if (!service) return;
+        // Update UI for detected service
+        if (service) {
+            document.getElementById('title').textContent = `🚀 Starting ${service.displayName}`;
+            document.getElementById('status').textContent = `Activating ${service.displayName}...`;
+            log(`Detected service: ${service.displayName} (${service.name})`);
+        } else {
+            log(`Unknown host: ${host}`);
+        }
+        
+        // Try to start service via webhook
+        function startService() {
+            if (!service) {
+                log('ERROR: No service mapping for this host');
+                return;
+            }
             
-            var webhookUrls = [
-                'http://192.168.99.101:9999/start/' + service.name,
-                'http://192.168.99.102:9999/start/' + service.name,
-                'http://192.168.99.103:9999/start/' + service.name
+            // Try all three manager nodes
+            const managerNodes = [
+                '192.168.99.101',
+                '192.168.99.102',
+                '192.168.99.103'
             ];
             
-            console.log('Starting service via webhook (trying all nodes)...');
+            log(`Sending webhook requests to start ${service.name}...`);
             
-            webhookUrls.forEach(function(url) {
-                fetch(url, {
+            managerNodes.forEach(function(nodeIp) {
+                const webhookUrl = `http://${nodeIp}:9999/start/${service.name}`;
+                
+                log(`Trying: ${webhookUrl}`);
+                
+                // Use fetch with no-cors mode (we don't need the response)
+                fetch(webhookUrl, {
                     method: 'POST',
-                    mode: 'no-cors'
-                }).catch(function() {
-                    console.log('Tried: ' + url);
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }).then(function() {
+                    log(`✓ Request sent to ${nodeIp}`);
+                }).catch(function(error) {
+                    log(`✗ Failed to ${nodeIp}: ${error.message}`);
                 });
+            });
+            
+            log('Webhook requests sent to all manager nodes');
+        }
+        
+        // Check if service is ready by trying to fetch the actual service
+        function checkServiceReady() {
+            checkAttempts++;
+            
+            if (checkAttempts > maxCheckAttempts) {
+                log('ERROR: Service did not start after 2 minutes');
+                document.getElementById('status').textContent = 'Service failed to start. Please try again.';
+                return;
+            }
+            
+            log(`Check attempt ${checkAttempts}/${maxCheckAttempts}`);
+            
+            // Try to fetch from the actual service
+            // When service is up, this request will succeed (or get a real response)
+            // When service is down, Traefik routes to this catchall
+            fetch(window.location.href, {
+                method: 'HEAD',
+                cache: 'no-cache',
+                redirect: 'manual'
+            })
+            .then(function(response) {
+                log(`HEAD response: ${response.status} ${response.statusText}`);
+                
+                // Check if we're still getting the splash page
+                const contentType = response.headers.get('content-type') || '';
+                
+                // If we get HTML, we might still be on the splash page
+                // If we get something else, the service is probably up
+                if (response.status === 200 && !contentType.includes('text/html')) {
+                    log('✓ Service appears to be ready (non-HTML response)');
+                    document.getElementById('status').textContent = 'Service ready! Reloading...';
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                    return true;
+                }
+                
+                // Check if we're being redirected (service is up)
+                if (response.type === 'opaqueredirect' || response.redirected) {
+                    log('✓ Service is redirecting (likely ready)');
+                    document.getElementById('status').textContent = 'Service ready! Reloading...';
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 1000);
+                    return true;
+                }
+                
+                return false;
+            })
+            .catch(function(error) {
+                log(`Check failed: ${error.message}`);
+                return false;
             });
         }
         
-        tryStartService();
-        
-        // Countdown
-        var countdownEl = document.getElementById('countdown');
-        var timer = setInterval(function() {
+        // Countdown timer
+        const countdownEl = document.getElementById('countdown');
+        const timer = setInterval(function() {
             countdown--;
             countdownEl.textContent = countdown;
-            if (countdown <= 0) clearInterval(timer);
+            if (countdown <= 0) {
+                clearInterval(timer);
+                log('Countdown finished');
+            }
         }, 1000);
         
-        // Check if service is ready
-        var checker = setInterval(function() {
-            fetch(window.location.href, {
-                method: 'HEAD',
-                cache: 'no-cache'
-            })
-            .then(function(response) {
-                var contentType = response.headers.get('content-type');
-                if (contentType && contentType.indexOf('text/html') === -1) {
-                    clearInterval(checker);
-                    clearInterval(timer);
-                    document.getElementById('status').textContent = 'Service ready! Reloading...';
-                    setTimeout(function() { window.location.reload(); }, 1000);
-                }
-            })
-            .catch(function() {});
-        }, 3000);
+        // Start the service immediately
+        startService();
         
-        setTimeout(function() { window.location.reload(); }, 60000);
+        // Start checking if service is ready
+        log('Starting service readiness checks...');
+        const checker = setInterval(function() {
+            checkServiceReady();
+        }, 3000); // Check every 3 seconds
+        
+        // Force reload after max time
+        setTimeout(function() {
+            log('Max wait time reached, forcing reload');
+            clearInterval(checker);
+            clearInterval(timer);
+            window.location.reload();
+        }, service ? (service.time * 1000) : 60000);
+        
+        log('Splash page loaded and initialized');
     </script>
 </body>
 </html>

@@ -19,25 +19,25 @@ services:
         - "traefik.enable=true"
         - "traefik.docker.network=traefik-public"
         
-        # Catch-all for Mealie
+        # Catch-all for Mealie (recipes.local)
         - "traefik.http.routers.jit-mealie-catchall.rule=Host(`recipes.local`)"
         - "traefik.http.routers.jit-mealie-catchall.entrypoints=web"
         - "traefik.http.routers.jit-mealie-catchall.priority=1"
         - "traefik.http.routers.jit-mealie-catchall.service=jit-catchall"
         
-        # Catch-all for MinIO
+        # Catch-all for MinIO (minio.local)
         - "traefik.http.routers.jit-minio-catchall.rule=Host(`minio.local`)"
         - "traefik.http.routers.jit-minio-catchall.entrypoints=web"
         - "traefik.http.routers.jit-minio-catchall.priority=1"
         - "traefik.http.routers.jit-minio-catchall.service=jit-catchall"
         
-        # Catch-all for Forgejo
+        # Catch-all for Forgejo (git.local)
         - "traefik.http.routers.jit-forgejo-catchall.rule=Host(`git.local`)"
         - "traefik.http.routers.jit-forgejo-catchall.entrypoints=web"
         - "traefik.http.routers.jit-forgejo-catchall.priority=1"
         - "traefik.http.routers.jit-forgejo-catchall.service=jit-catchall"
         
-        # Catch-all for Vaultwarden
+        # Catch-all for Vaultwarden (vault.local)
         - "traefik.http.routers.jit-vaultwarden-catchall.rule=Host(`vault.local`)"
         - "traefik.http.routers.jit-vaultwarden-catchall.entrypoints=web"
         - "traefik.http.routers.jit-vaultwarden-catchall.priority=1"
