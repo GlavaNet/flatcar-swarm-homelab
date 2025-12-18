@@ -1,6 +1,4 @@
 # Flatcar deployment artifacts
-scripts/flatcar-install
-scripts/flatcar-pi-deploy
 *.ign
 *.yaml.bak
 
@@ -21,10 +19,6 @@ id_rsa*
 # OS files
 .DS_Store
 Thumbs.db
-
-# Drone CI
-drone-stack.yml
-.drone.secret
 
 # Environment files with secrets
 .env
