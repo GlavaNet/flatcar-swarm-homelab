@@ -62,6 +62,21 @@ done
 echo "✓ SSH keys distributed"
 
 # ============================================================================
+# ntfy Configuration
+# ============================================================================
+
+echo ""
+echo "=== Configuring ntfy Notifications ==="
+
+if [ -f scripts/setup-ntfy-url.sh ]; then
+    export NTFY_TOPIC_URL=$(bash scripts/setup-ntfy-url.sh)
+    echo "ntfy URL configured: $NTFY_TOPIC_URL"
+    echo "Install ntfy app and subscribe to receive alerts on your phone"
+else
+    echo "⚠️  ntfy helper script not found, notifications disabled"
+fi
+
+# ============================================================================
 # TLS Certificate Generation
 # ============================================================================
 

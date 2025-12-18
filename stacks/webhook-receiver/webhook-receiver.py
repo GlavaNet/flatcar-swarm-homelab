@@ -5,12 +5,8 @@ from urllib.parse import urlparse
 
 LISTEN_PORT = 9999
 WEBHOOK_SECRET = os.environ.get('WEBHOOK_SECRET', '')
-JIT_SERVICES = {'mealie_mealie': 60, 'minio_minio': 30, 'forgejo_forgejo': 60}
-    'vaultwarden_vaultwarden': 60,
-    'vaultwarden_vaultwarden': 60,
-SERVICE_MAP = {'mealie': 'mealie_mealie', 'minio': 'minio_minio', 'forgejo': 'forgejo_forgejo'}
-    'vaultwarden': 'vaultwarden_vaultwarden',
-    'vaultwarden': 'vaultwarden_vaultwarden',
+JIT_SERVICES = {'mealie_mealie': 60, 'minio_minio': 30, 'forgejo_forgejo': 60, 'vaultwarden_vaultwarden': 60}
+SERVICE_MAP = {'mealie': 'mealie_mealie', 'minio': 'minio_minio', 'forgejo': 'forgejo_forgejo', 'vaultwarden': 'vaultwarden_vaultwarden'}
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(levelname)s: %(message)s')
 
