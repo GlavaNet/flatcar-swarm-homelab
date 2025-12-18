@@ -1,201 +1,278 @@
 #!/bin/bash
 # git-deploy-notify.sh - GitOps deployment wrapper with ntfy notifications
-#
-# This script:
-# 1. Checks for new commits from GitHub
-# 2. Pulls changes if found
-# 3. Deploys updated stacks
-# 4. Sends notifications via ntfy
-# 5. Logs everything to both journal and file
-#
-# Exit codes:
-#   0 = Success (either no changes or deployment succeeded)
-#   1 = Failure (deployment failed)
+# IMPROVED VERSION with better error handling and debugging
 
 set -e  # Exit on any error
 
 # Configuration
-NTFY_URL="${NTFY_TOPIC_URL:-http://ntfy.local/swarm-alerts}"
 REPO_DIR="/home/core/flatcar-swarm-homelab"
 LOG_FILE="${REPO_DIR}/deploy.log"
+
+# Get NTFY_TOPIC_URL from multiple sources (in order of preference)
+if [ -z "$NTFY_TOPIC_URL" ]; then
+    # Try .env.local
+    if [ -f "${REPO_DIR}/.env.local" ]; then
+        source "${REPO_DIR}/.env.local"
+    fi
+fi
+
+if [ -z "$NTFY_TOPIC_URL" ]; then
+    # Try ~/.ntfy-url
+    if [ -f "$HOME/.ntfy-url" ]; then
+        NTFY_TOPIC_URL=$(cat "$HOME/.ntfy-url")
+    fi
+fi
+
+if [ -z "$NTFY_TOPIC_URL" ]; then
+    # Default to local ntfy
+    NTFY_TOPIC_URL="http://ntfy.local/swarm-alerts"
+fi
 
 # ============================================================================
 # Functions
 # ============================================================================
 
 # Send notification to ntfy
-# Args: title, message, priority, tags
 send_notification() {
     local title="$1"
     local message="$2"
     local priority="${3:-default}"
     local tags="${4:-rocket}"
     
-    # Always log to journal so it appears in journalctl
+    # Always log to stdout/journal
     echo "[NTFY] $title: $message"
     
-    # Try to send to ntfy, but don't fail if it's unavailable
-    if curl -sf -m 5 \
+    # Skip if NTFY_TOPIC_URL is explicitly set to empty or "disabled"
+    if [ -z "$NTFY_TOPIC_URL" ] || [ "$NTFY_TOPIC_URL" = "disabled" ]; then
+        echo "[NTFY] Notifications disabled"
+        return 0
+    fi
+    
+    # Try to send to ntfy with timeout
+    if timeout 10 curl -sf \
          -H "Title: ${title}" \
          -H "Priority: ${priority}" \
          -H "Tags: ${tags}" \
          -d "${message}" \
-         "${NTFY_URL}" > /dev/null 2>&1; then
-        echo "[NTFY] Notification sent successfully"
+         "${NTFY_TOPIC_URL}" > /dev/null 2>&1; then
+        echo "[NTFY] ✓ Notification sent"
+        return 0
     else
-        echo "[NTFY] Warning: Failed to send notification (ntfy may be unavailable)"
-        # Don't exit - notifications are nice-to-have, not critical
+        echo "[NTFY] ⚠️ Failed to send notification (endpoint may be unavailable)"
+        # Don't fail the script if notifications fail
+        return 0
     fi
 }
 
 # Log to both journal and file
 log() {
     local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" >> "$LOG_FILE"
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo "$timestamp $message"
+    echo "$timestamp $message" >> "$LOG_FILE"
 }
 
 # ============================================================================
-# Main Script
+# Pre-flight checks
 # ============================================================================
 
 log "=== GitOps Deployment Check Started ==="
+log "NTFY_TOPIC_URL: ${NTFY_TOPIC_URL}"
 
-# Ensure log directory exists
+# Create log directory if needed
 mkdir -p "$(dirname "$LOG_FILE")"
 
-# Change to repository directory
-if ! cd "$REPO_DIR"; then
-    log "ERROR: Cannot access repository directory: $REPO_DIR"
+# Verify repository directory exists
+if [ ! -d "$REPO_DIR" ]; then
+    log "ERROR: Repository directory not found: $REPO_DIR"
     send_notification \
         "GitOps: Critical Error" \
-        "Cannot access repository directory" \
+        "Repository directory not found" \
         "urgent" \
         "x,file_folder"
     exit 1
 fi
 
-log "Repository directory: $(pwd)"
+# Change to repository
+cd "$REPO_DIR" || {
+    log "ERROR: Cannot change to repository directory"
+    send_notification \
+        "GitOps: Critical Error" \
+        "Cannot access repository" \
+        "urgent" \
+        "x,file_folder"
+    exit 1
+}
+
+log "Working directory: $(pwd)"
 
 # ============================================================================
-# Step 1: Fetch latest changes from GitHub
+# Test network connectivity
+# ============================================================================
+
+log "Testing network connectivity to GitHub..."
+
+if timeout 5 curl -sf https://github.com > /dev/null 2>&1; then
+    log "✓ GitHub is reachable"
+else
+    log "⚠️ GitHub may not be reachable (continuing anyway)"
+fi
+
+# ============================================================================
+# Step 1: Fetch latest changes from origin
 # ============================================================================
 
 log "Fetching latest changes from origin/main..."
 
-if ! git fetch origin; then
-    log "ERROR: git fetch failed"
-    send_notification \
-        "GitOps: Fetch Failed" \
-        "Unable to fetch from GitHub repository" \
-        "high" \
-        "x,git"
+# Use timeout to prevent hanging
+if timeout 30 git fetch origin 2>&1 | tee -a "$LOG_FILE"; then
+    log "✓ Git fetch completed successfully"
+else
+    EXIT_CODE=$?
+    log "ERROR: git fetch failed with exit code $EXIT_CODE"
+    
+    # More detailed error message
+    if [ $EXIT_CODE -eq 124 ]; then
+        log "ERROR: git fetch timed out after 30 seconds"
+        send_notification \
+            "GitOps: Fetch Timeout" \
+            "Git fetch timed out - check network connectivity" \
+            "high" \
+            "x,git,clock"
+    else
+        send_notification \
+            "GitOps: Fetch Failed" \
+            "Git fetch failed - check logs on manager-1" \
+            "high" \
+            "x,git"
+    fi
+    
     exit 1
 fi
 
-log "Fetch completed successfully"
-
 # ============================================================================
-# Step 2: Check if there are new commits
+# Step 2: Compare commits
 # ============================================================================
 
-LOCAL=$(git rev-parse HEAD)
-REMOTE=$(git rev-parse origin/main)
+LOCAL=$(git rev-parse HEAD 2>&1) || {
+    log "ERROR: Cannot determine local commit"
+    exit 1
+}
+
+REMOTE=$(git rev-parse origin/main 2>&1) || {
+    log "ERROR: Cannot determine remote commit (fetch may have failed)"
+    exit 1
+}
 
 log "Local commit:  $LOCAL"
 log "Remote commit: $REMOTE"
 
+# Check if up to date
 if [ "$LOCAL" = "$REMOTE" ]; then
-    log "No new changes detected - exiting normally"
+    log "✓ No new changes detected"
     exit 0
 fi
 
-log "New changes detected!"
+log "✓ New changes detected!"
 
 # ============================================================================
-# Step 3: Pull changes and notify
+# Step 3: Get commit details
+# ============================================================================
+
+CURRENT_HASH=$(git rev-parse --short origin/main)
+COMMIT_MSG=$(git log origin/main -1 --pretty=%B | head -n1)
+COMMIT_AUTHOR=$(git log origin/main -1 --pretty="%an")
+
+log "Commit: $CURRENT_HASH"
+log "Author: $COMMIT_AUTHOR"
+log "Message: $COMMIT_MSG"
+
+# ============================================================================
+# Step 4: Notify about deployment start
 # ============================================================================
 
 send_notification \
     "GitOps: Deployment Starting" \
-    "Pulling latest changes from repository..." \
+    "Pulling changes: ${COMMIT_MSG}" \
     "default" \
     "rocket"
 
+# ============================================================================
+# Step 5: Pull changes
+# ============================================================================
+
 log "Resetting to origin/main..."
-git reset --hard origin/main
 
-# Get commit information
-CURRENT_HASH=$(git rev-parse --short HEAD)
-COMMIT_MSG=$(git log -1 --pretty=%B | head -n1)
-
-log "Updated to commit: $CURRENT_HASH"
-log "Commit message: $COMMIT_MSG"
+if git reset --hard origin/main 2>&1 | tee -a "$LOG_FILE"; then
+    log "✓ Repository updated successfully"
+else
+    log "ERROR: git reset failed"
+    send_notification \
+        "GitOps: Update Failed" \
+        "Failed to update repository" \
+        "urgent" \
+        "x,git"
+    exit 1
+fi
 
 send_notification \
     "GitOps: Repository Updated" \
-    "Commit: ${CURRENT_HASH} - ${COMMIT_MSG}" \
+    "Commit: ${CURRENT_HASH} by ${COMMIT_AUTHOR}" \
     "default" \
     "git"
 
 # ============================================================================
-# Step 4: Determine which deployment script to use
+# Step 6: Find deployment script
 # ============================================================================
+
+log "Looking for deployment script..."
 
 DEPLOY_SCRIPT=""
 
-# Prefer deploy-services-env.sh (environment variable version)
-if [ -f scripts/deploy-services-env.sh ]; then
-    DEPLOY_SCRIPT="scripts/deploy-services-env.sh"
-    log "Using environment-aware deployment script: $DEPLOY_SCRIPT"
-    
-    # Check if .env.local exists
-    if [ ! -f .env.local ]; then
-        log "WARNING: .env.local not found - deployment may fail"
-        log "Create it from template: cp .env.template .env.local"
-    fi
-
-# Fall back to deploy-services.sh (basic version)
-elif [ -f scripts/deploy-services.sh ]; then
+# Prefer deploy-services.sh
+if [ -f scripts/deploy-services.sh ]; then
     DEPLOY_SCRIPT="scripts/deploy-services.sh"
-    log "Using basic deployment script: $DEPLOY_SCRIPT"
-
-# No deployment script found
+    log "✓ Found deployment script: $DEPLOY_SCRIPT"
 else
     log "ERROR: No deployment script found"
-    log "Looked for:"
-    log "  - scripts/deploy-services-env.sh"
-    log "  - scripts/deploy-services.sh"
+    log "Looked for: scripts/deploy-services.sh"
     
     send_notification \
-        "GitOps: Deployment Failed" \
-        "No deployment script found in repository" \
+        "GitOps: No Deploy Script" \
+        "Deployment script not found in repository" \
         "urgent" \
         "x,rocket"
+    
     exit 1
 fi
 
 # ============================================================================
-# Step 5: Execute deployment
+# Step 7: Run deployment
 # ============================================================================
 
 log "=== Starting Deployment ==="
 log "Script: $DEPLOY_SCRIPT"
 log "Time: $(date)"
+log ""
 
-# Run deployment script
-# - Redirect all output to both console (journal) and log file
-# - Capture exit code
-set +e  # Don't exit on error yet - we want to handle it
+# Source environment if available
+if [ -f .env.local ]; then
+    log "Loading .env.local..."
+    source .env.local
+fi
+
+# Run deployment
+set +e  # Don't exit immediately on error
 bash "$DEPLOY_SCRIPT" 2>&1 | tee -a "$LOG_FILE"
 DEPLOY_EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
+log ""
 log "=== Deployment Finished ==="
 log "Exit code: $DEPLOY_EXIT_CODE"
 
 # ============================================================================
-# Step 6: Report results
+# Step 8: Report results
 # ============================================================================
 
 if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
@@ -203,18 +280,18 @@ if [ $DEPLOY_EXIT_CODE -eq 0 ]; then
     
     send_notification \
         "GitOps: Deployment Successful" \
-        "All services deployed successfully. Commit: ${CURRENT_HASH}" \
+        "Commit ${CURRENT_HASH} deployed successfully" \
         "default" \
         "white_check_mark,rocket"
     
     exit 0
 else
     log "✗ Deployment failed with exit code $DEPLOY_EXIT_CODE"
-    log "Check logs for details: $LOG_FILE"
+    log "Check logs: $LOG_FILE"
     
     send_notification \
         "GitOps: Deployment Failed" \
-        "Deployment failed for commit ${CURRENT_HASH}. Check logs on manager-1." \
+        "Commit ${CURRENT_HASH} deployment failed. Check logs." \
         "urgent" \
         "x,rocket"
     
