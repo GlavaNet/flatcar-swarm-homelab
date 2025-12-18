@@ -30,10 +30,10 @@ echo "  TAILSCALE_HOSTNAME: $TAILSCALE_HOSTNAME"
 echo "  PRIMARY_MANAGER_IP: $PRIMARY_MANAGER_IP"
 echo ""
 
-# If NTFY_TOPIC_URL not set in .env.local, use or create ~/.ntfy-url\
-if [ -z "$NTFY_TOPIC_URL" ] && [ -f scripts/setup-ntfy-url.sh ]; then\
-    export NTFY_TOPIC_URL=$(bash scripts/setup-ntfy-url.sh)\
-    echo "  NTFY_TOPIC_URL: $NTFY_TOPIC_URL (auto-configured)"\
+# If NTFY_TOPIC_URL not set in .env.local, use or create ~/.ntfy-url
+if [ -z "$NTFY_TOPIC_URL" ] && [ -f scripts/setup-ntfy-url.sh ]; then
+    export NTFY_TOPIC_URL=$(bash scripts/setup-ntfy-url.sh)
+    echo "  NTFY_TOPIC_URL: $NTFY_TOPIC_URL (auto-configured)"
 fi
 
 # Ensure certs directory exists
