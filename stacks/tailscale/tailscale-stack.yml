@@ -16,7 +16,7 @@ services:
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_USERSPACE=false
       - TS_ROUTES=192.168.99.0/24
-      - TS_EXTRA_ARGS=--advertise-exit-node --reset
+      - TS_EXTRA_ARGS=--advertise-exit-node
       - TS_ACCEPT_DNS=true
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -31,9 +31,9 @@ services:
         constraints:
           - node.role == manager
       restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
+        condition: any
+        delay: 10s
+        max_attempts: 0
 
 secrets:
   tailscale_auth_key:
