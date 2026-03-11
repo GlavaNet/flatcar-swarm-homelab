@@ -13,7 +13,7 @@ LOG_FILE="/var/log/swarm-bootstrap.log"
 
 # Logging function
 log() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG_FILE" >&2
 }
 
 # Wait for Docker to be ready
