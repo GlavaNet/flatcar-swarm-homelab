@@ -87,7 +87,7 @@ echo "Waiting 30 seconds for swarm to form..."
 sleep 30
 
 echo "Running cluster initialization on manager-1..."
-ssh -o StrictHostKeyChecking=no core@192.168.99.101 '/home/core/cluster-init.sh' || {
+ssh -A -o StrictHostKeyChecking=no core@192.168.99.101 '/home/core/cluster-init.sh' || {
     echo "Warning: cluster-init.sh not found or failed"
     echo "Run manually: ssh core@192.168.99.101 '/home/core/cluster-init.sh'"
 }
