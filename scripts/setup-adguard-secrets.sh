@@ -49,6 +49,39 @@ echo "Secrets stored in Docker Swarm:"
 echo "  - adguard_username"
 echo "  - adguard_password_hash"
 echo ""
+
+# ===========================================================================
+# Disable systemd-resolved stub listener on all manager nodes
+# AdGuard requires exclusive use of port 53; the resolved stub listener
+# conflicts with it and will cause the container to fail to start.
+# ===========================================================================
+
+echo "=== Preparing nodes for AdGuard (port 53) ==="
+echo ""
+
+# Discover manager IPs from swarm
+MANAGER_IPS=$(docker node ls --filter role=manager --format '{{.Hostname}}' | \
+    xargs -I{} docker node inspect {} --format '{{range .Status}}{{.Addr}}{{end}}' 2>/dev/null) || true
+
+if [ -z "$MANAGER_IPS" ]; then
+    echo "⚠️  Could not discover manager nodes from swarm."
+    echo "   Manually disable systemd-resolved stub listener on all managers:"
+    echo "     sudo mkdir -p /etc/systemd/resolved.conf.d"
+    echo "     echo -e '[Resolve]\nDNSStubListener=no' | sudo tee /etc/systemd/resolved.conf.d/no-stub.conf"
+    echo "     sudo systemctl restart systemd-resolved"
+else
+    for ip in $MANAGER_IPS; do
+        echo "Disabling resolved stub listener on $ip..."
+        ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 core@"$ip" \
+            'sudo mkdir -p /etc/systemd/resolved.conf.d && \
+             echo -e "[Resolve]\nDNSStubListener=no" | \
+             sudo tee /etc/systemd/resolved.conf.d/no-stub.conf > /dev/null && \
+             sudo systemctl restart systemd-resolved && \
+             echo "  ✓ Done"' || echo "  ⚠️  Could not reach $ip — apply manually"
+    done
+fi
+
+echo ""
 echo "Deploy AdGuard with:"
 echo "  docker stack deploy -c stacks/adguard/adguard-stack.yml adguard"
 echo ""

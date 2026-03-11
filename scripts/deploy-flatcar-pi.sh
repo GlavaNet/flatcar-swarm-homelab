@@ -171,7 +171,7 @@ install_flatcar_to_device() {
     sudo umount ${device}* 2>/dev/null || true
     
     print_info "Running flatcar-install (this will take 5-10 minutes)..."
-    sudo ./flatcar-install \
+    sudo "$WORK_DIR/flatcar-install" \
         -d "$device" \
         -C "$FLATCAR_VERSION" \
         -B "$FLATCAR_BOARD" \

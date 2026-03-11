@@ -3,7 +3,7 @@
 
 set -e
 
-REPO_DIR="$HOME/flatcar-swarm-homelab"
+REPO_DIR="$( cd "$(dirname "$0")/.." && pwd )"
 cd "$REPO_DIR"
 
 echo "=== Flatcar Swarm Deployment ==="
