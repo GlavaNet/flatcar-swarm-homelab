@@ -41,29 +41,59 @@ if [ ! -f ~/.ssh/id_rsa ]; then
     echo "✓ Generated SSH key on manager-1"
 fi
 
-# Distribute keys between all managers
+MANAGER1_PUBKEY=$(cat ~/.ssh/id_rsa.pub)
+
+# For each remote manager, perform the entire key exchange in a SINGLE ssh session
+# to avoid triggering account lockout from rapid reconnects.
+# Each node: generates its own key if missing, accepts manager-1's key, returns its pubkey.
+declare -A REMOTE_PUBKEYS
+
 for node in "${MANAGER_NODES[@]}"; do
-    echo "Setting up keys with $node..."
-    
-    # Copy manager-1's key to other node
-    cat ~/.ssh/id_rsa.pub | ssh -o StrictHostKeyChecking=no core@$node "cat >> ~/.ssh/authorized_keys" 2>/dev/null || echo "  Key already present"
-    
-    # Generate key on remote node if missing and copy back
-    ssh core@$node 'if [ ! -f ~/.ssh/id_rsa ]; then ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa; fi && cat ~/.ssh/id_rsa.pub' >> ~/.ssh/authorized_keys 2>/dev/null || echo "  Key already present"
+    echo "Exchanging keys with $node..."
+
+    REMOTE_PUBKEYS[$node]=$(ssh -o StrictHostKeyChecking=no core@$node bash << ENDSSH
+# Generate key if missing
+if [ ! -f ~/.ssh/id_rsa ]; then
+    ssh-keygen -t rsa -N "" -f ~/.ssh/id_rsa
+fi
+
+# Add manager-1's key if not already present
+if ! grep -qF "${MANAGER1_PUBKEY}" ~/.ssh/authorized_keys 2>/dev/null; then
+    echo "${MANAGER1_PUBKEY}" >> ~/.ssh/authorized_keys
+fi
+
+# Return this node's public key
+cat ~/.ssh/id_rsa.pub
+ENDSSH
+    )
+    echo "  ✓ Got key from $node"
 done
 
-# Copy keys between manager-2 and manager-3
-ssh core@192.168.99.102 "cat ~/.ssh/id_rsa.pub" | ssh core@192.168.99.103 "cat >> ~/.ssh/authorized_keys" 2>/dev/null || true
-ssh core@192.168.99.103 "cat ~/.ssh/id_rsa.pub" | ssh core@192.168.99.102 "cat >> ~/.ssh/authorized_keys" 2>/dev/null || true
-
-# Remove duplicates on all nodes
-for node in 192.168.99.101 "${MANAGER_NODES[@]}"; do
-    if [ "$node" = "192.168.99.101" ]; then
-        sort -u ~/.ssh/authorized_keys > /tmp/auth && mv /tmp/auth ~/.ssh/authorized_keys
-    else
-        ssh core@$node 'sort -u ~/.ssh/authorized_keys > /tmp/auth && mv /tmp/auth ~/.ssh/authorized_keys' 2>/dev/null || true
+# Add all remote keys to manager-1's authorized_keys
+for node in "${MANAGER_NODES[@]}"; do
+    if ! grep -qF "${REMOTE_PUBKEYS[$node]}" ~/.ssh/authorized_keys 2>/dev/null; then
+        echo "${REMOTE_PUBKEYS[$node]}" >> ~/.ssh/authorized_keys
     fi
 done
+
+# Build the complete deduplicated authorized_keys on manager-1,
+# then push it to each remote node in a single SSH session.
+# This avoids any cross-node SSH (manager-2 -> manager-3) which was the main lockout trigger.
+ALL_KEYS=$(sort -u ~/.ssh/authorized_keys)
+
+for node in "${MANAGER_NODES[@]}"; do
+    ssh -o StrictHostKeyChecking=no core@$node bash << ENDSSH
+printf '%s\n' "${ALL_KEYS}" > /tmp/auth_keys_new
+# Merge with any keys on the remote not already captured
+cat ~/.ssh/authorized_keys >> /tmp/auth_keys_new 2>/dev/null || true
+sort -u /tmp/auth_keys_new > ~/.ssh/authorized_keys
+rm /tmp/auth_keys_new
+ENDSSH
+    echo "  ✓ Keys synced to $node"
+done
+
+# Deduplicate manager-1's own authorized_keys
+sort -u ~/.ssh/authorized_keys > /tmp/auth && mv /tmp/auth ~/.ssh/authorized_keys
 
 echo "✓ SSH keys distributed"
 
@@ -76,15 +106,15 @@ echo "=== Configuring ntfy Notifications ==="
 
 if [ ! -f /home/core/.ntfy-url ]; then
     echo "Generating unique ntfy topic..."
-    
+
     RANDOM_ID=$(openssl rand -hex 6)
     NTFY_URL="https://ntfy.sh/flatcar-swarm-${RANDOM_ID}"
-    
+
     echo "$NTFY_URL" > /home/core/.ntfy-url
     chmod 600 /home/core/.ntfy-url
-    
+
     export NTFY_TOPIC_URL="$NTFY_URL"
-    
+
     echo "✓ ntfy configured: $NTFY_URL"
     echo ""
     echo "📱 To receive notifications on your phone:"
@@ -141,17 +171,17 @@ fi
 if [ -f stacks/minio/minio-stack.yml ]; then
     sed "s/\${MINIO_PASSWORD}/$MINIO_PASSWORD/g" \
         stacks/minio/minio-stack.yml > /tmp/minio-deploy.yml
-    
+
     docker stack deploy -c /tmp/minio-deploy.yml minio
     rm /tmp/minio-deploy.yml
-    
+
     echo "Waiting for MinIO to start..."
     sleep 30
-    
+
     # Create backups bucket
     docker run --rm --network host --entrypoint /bin/sh minio/mc:latest \
         -c "mc alias set homelab http://localhost:9000 minioadmin ${MINIO_PASSWORD} && mc mb homelab/backups --ignore-existing" 2>/dev/null || echo "Bucket may already exist"
-    
+
     echo "✓ MinIO deployed with backups bucket"
 fi
 
@@ -166,7 +196,7 @@ if [ -f scripts/backup-to-minio.sh ]; then
     # Copy backup script
     sudo cp scripts/backup-to-minio.sh /opt/bin/
     sudo chmod +x /opt/bin/backup-to-minio.sh
-    
+
     # Create service
     sudo tee /etc/systemd/system/minio-backup.service > /dev/null << 'EOF'
 [Unit]
@@ -181,7 +211,7 @@ ExecStart=/opt/bin/backup-to-minio.sh
 StandardOutput=journal
 StandardError=journal
 EOF
-    
+
     # Create timer
     sudo tee /etc/systemd/system/minio-backup.timer > /dev/null << 'EOF'
 [Unit]
@@ -194,11 +224,11 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
-    
+
     sudo systemctl daemon-reload
     sudo systemctl enable minio-backup.timer
     sudo systemctl start minio-backup.timer
-    
+
     echo "✓ MinIO backup service installed"
 fi
 
@@ -212,7 +242,7 @@ echo "=== Installing volume replication service ==="
 if [ -f scripts/replicate-volumes.sh ]; then
     sudo cp scripts/replicate-volumes.sh /opt/bin/
     sudo chmod +x /opt/bin/replicate-volumes.sh
-    
+
     sudo tee /etc/systemd/system/volume-replication.service > /dev/null << 'EOF'
 [Unit]
 Description=Replicate Docker volumes to backup managers
@@ -226,7 +256,7 @@ ExecStart=/opt/bin/replicate-volumes.sh
 StandardOutput=journal
 StandardError=journal
 EOF
-    
+
     sudo tee /etc/systemd/system/volume-replication.timer > /dev/null << 'EOF'
 [Unit]
 Description=Daily volume replication
@@ -238,11 +268,11 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 EOF
-    
+
     sudo systemctl daemon-reload
     sudo systemctl enable volume-replication.timer
     sudo systemctl start volume-replication.timer
-    
+
     echo "✓ Volume replication service installed"
 fi
 
@@ -281,11 +311,11 @@ send_notification() {
     local message="$2"
     local priority="${3:-default}"
     local tags="${4:-rocket}"
-    
+
     echo "[NTFY] $title: $message"
-    
+
     [ -z "$NTFY_TOPIC_URL" ] || [ "$NTFY_TOPIC_URL" = "disabled" ] && return 0
-    
+
     timeout 10 curl -sf \
          -H "Title: ${title}" \
          -H "Priority: ${priority}" \
@@ -480,7 +510,7 @@ if [ ! -f /home/core/.cluster-initialized ]; then
     if [ -f scripts/deploy-services.sh ]; then
         bash scripts/deploy-services.sh
     fi
-    
+
     touch /home/core/.cluster-initialized
     echo "✓ Initial deployment complete"
 else
